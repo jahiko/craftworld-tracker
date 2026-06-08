@@ -18,6 +18,7 @@
     @keyframes slideDown{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
     @keyframes fadeIn{from{opacity:0;transform:scale(.97)}to{opacity:1;transform:scale(1)}}
     @keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
     .pool-card{transition:border-color .2s,transform .2s}
     .pool-card:hover{border-color:#00e5a030!important;transform:translateY(-2px)!important}
     button:hover:not(:disabled){opacity:.8;cursor:pointer}
@@ -29,78 +30,40 @@
 <body>
 <div id="root"></div>
 
-<!-- ── CONTRASEÑA: cambia el valor de CW_PASSWORD por la que quieras ── -->
 <script>
-  const CW_PASSWORD = "craftworld2024";   // <── CAMBIA ESTO
-
-  // Hash simple para no guardar la contraseña en texto plano en sessionStorage
-  function simpleHash(s){
-    let h=0;
-    for(let i=0;i<s.length;i++){h=Math.imul(31,h)+s.charCodeAt(i)|0;}
-    return h.toString(36);
-  }
-
-  const EXPECTED   = simpleHash(CW_PASSWORD);
-  const SESSION_KEY= "cw_session_v1";
-
-  window._cwAuth = {
-    check: () => sessionStorage.getItem(SESSION_KEY) === EXPECTED,
-    login: (pass) => {
-      if(simpleHash(pass) === EXPECTED){
-        sessionStorage.setItem(SESSION_KEY, EXPECTED);
-        return true;
-      }
-      return false;
-    }
+  const CW_PASSWORD = "craftworld2024"; // <── CAMBIA ESTO
+  function simpleHash(s){let h=0;for(let i=0;i<s.length;i++){h=Math.imul(31,h)+s.charCodeAt(i)|0;}return h.toString(36);}
+  const EXPECTED=""; // se calcula en runtime
+  const SESSION_KEY="cw_session_v2";
+  window._cwAuth={
+    check:()=>sessionStorage.getItem(SESSION_KEY)===simpleHash(CW_PASSWORD),
+    login:(pass)=>{if(simpleHash(pass)===simpleHash(CW_PASSWORD)){sessionStorage.setItem(SESSION_KEY,simpleHash(CW_PASSWORD));return true;}return false;}
   };
 </script>
 
 <script type="text/babel">
-const { useState, useEffect, useRef, useCallback } = React;
+const { useState, useEffect, useRef, useCallback, useMemo } = React;
 
-/* ════════════════════════════════════════════════════════
-   PANTALLA DE LOGIN
-════════════════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════
+   LOGIN
+══════════════════════════════════════════════ */
 function LoginScreen({ onAuth }) {
-  const [pass, setPass]   = useState("");
-  const [error, setError] = useState(false);
-  const [shake, setShake] = useState(false);
-  const inputRef = useRef(null);
-
+  const [pass,setPass]=useState(""); const [error,setError]=useState(false); const [shake,setShake]=useState(false);
+  const inputRef=useRef(null);
   useEffect(()=>{ inputRef.current?.focus(); },[]);
-
-  const attempt = () => {
-    if(window._cwAuth.login(pass)){
-      onAuth();
-    } else {
-      setError(true);
-      setShake(true);
-      setPass("");
-      setTimeout(()=>setShake(false), 500);
-      setTimeout(()=>inputRef.current?.focus(), 100);
-    }
+  const attempt=()=>{
+    if(window._cwAuth.login(pass)){ onAuth(); }
+    else{ setError(true);setShake(true);setPass(""); setTimeout(()=>setShake(false),500); setTimeout(()=>inputRef.current?.focus(),100); }
   };
-
   return (
     <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:"100vh",padding:20,animation:"fadeIn .5s ease"}}>
-      <div style={{
-        width:"100%",maxWidth:360,background:"#09101d",
-        border:"1px solid #0e1e30",borderRadius:14,padding:"40px 32px",
-        display:"flex",flexDirection:"column",alignItems:"center",gap:22,
-        animation: shake ? "shake .45s ease" : "none",
-      }}>
+      <div style={{width:"100%",maxWidth:360,background:"#09101d",border:"1px solid #0e1e30",borderRadius:14,padding:"40px 32px",display:"flex",flexDirection:"column",alignItems:"center",gap:22,animation:shake?"shake .45s ease":"none"}}>
         <div style={{fontSize:60,animation:"glowHex 3s ease infinite"}}>⬡</div>
         <div style={{textAlign:"center"}}>
           <div style={{fontSize:16,fontWeight:"bold",color:"#e8f4ff",letterSpacing:5}}>CRAFT WORLD</div>
           <div style={{fontSize:9,color:"#00e5a070",letterSpacing:5,marginTop:4}}>PRICE TRACKER · PRIVADO</div>
         </div>
-
-        {error && (
-          <div style={{background:"#2a0d0d",border:"1px solid #ff3a3a40",color:"#ff6060",fontSize:11,padding:"8px 14px",borderRadius:5,width:"100%",textAlign:"center",animation:"slideDown .3s ease"}}>
-            ⚠ Contraseña incorrecta
-          </div>
-        )}
-
+        {error&&<div style={{background:"#2a0d0d",border:"1px solid #ff3a3a40",color:"#ff6060",fontSize:11,padding:"8px 14px",borderRadius:5,width:"100%",textAlign:"center",animation:"slideDown .3s ease"}}>⚠ Contraseña incorrecta</div>}
         <div style={{width:"100%",display:"flex",flexDirection:"column",gap:8}}>
           <label style={{fontSize:10,color:"#2a4a5a",textTransform:"uppercase",letterSpacing:1}}>Contraseña</label>
           <input ref={inputRef} type="password" value={pass}
@@ -109,75 +72,80 @@ function LoginScreen({ onAuth }) {
             placeholder="••••••••"
             style={{width:"100%",background:"#070b12",border:`1px solid ${error?"#ff3a3a60":"#0e1e30"}`,color:"#e8f4ff",padding:"12px 14px",borderRadius:6,fontFamily:"'Courier New',monospace",fontSize:16,letterSpacing:4}}/>
         </div>
-
-        <button onClick={attempt}
-          style={{width:"100%",padding:13,borderRadius:6,border:"1px solid #00e5a040",background:"#0d2a1a",color:"#00e5a0",fontSize:13,fontFamily:"'Courier New',monospace",fontWeight:"bold",letterSpacing:2}}>
-          ENTRAR →
-        </button>
+        <button onClick={attempt} style={{width:"100%",padding:13,borderRadius:6,border:"1px solid #00e5a040",background:"#0d2a1a",color:"#00e5a0",fontSize:13,fontFamily:"'Courier New',monospace",fontWeight:"bold",letterSpacing:2}}>ENTRAR →</button>
       </div>
-      <p style={{marginTop:14,fontSize:9,color:"#111820",letterSpacing:1}}>ACCESO RESTRINGIDO</p>
     </div>
   );
 }
 
-/* ════════════════════════════════════════════════════════
-   DATOS: 29 POOLS CRAFT WORLD (RONIN)
-════════════════════════════════════════════════════════ */
-const POOLS = [
-  {id:"1",  address:"0xc356cd52364541379ad4d31a889b7031e758220a"},
-  {id:"2",  address:"0xf14ad4a21a9e71ba967b8b99e278d03a1933b44a"},
-  {id:"3",  address:"0xe973dc221bb031010ec673105ed8b04c9e713b9d"},
-  {id:"4",  address:"0xb287ea5a5cd4f2b74571e30fdec96241aa5163d9"},
-  {id:"5",  address:"0x8b1a1b7b43a53904b0a05406c13399079e553501"},
-  {id:"6",  address:"0x6d8839a585f7877a5e218a217c07334980f04a4a"},
-  {id:"7",  address:"0xa09dda31b854720b6d2f28dee9c87b05d0b80d14"},
-  {id:"8",  address:"0xd1d6bb059c97295f7437ad423111047cbcddf4c6"},
-  {id:"9",  address:"0x6ccd01c951e57d82be8dccb90c01a58bfb4d83cd"},
-  {id:"10", address:"0xe63f8cefea9a17a259bb3b375929bd10d5e1cdfa"},
-  {id:"11", address:"0x54ae64826ca9d440ede8c33e6cf4cfa1a3aa5801"},
-  {id:"12", address:"0xfa3a564b27deb29781f80032df662a4406eebef6"},
-  {id:"13", address:"0x70c063f17dacb35e4b3df06c8f36020416a44a3c"},
-  {id:"14", address:"0x4343846ebe54dcd40ba572275640230d533296e5"},
-  {id:"15", address:"0x7aa1cc00ca62982ab10d12fd4f6b6687f33011ad"},
-  {id:"16", address:"0x4782e36bbe6e9abca5357d3e43a090fa772de71b"},
-  {id:"17", address:"0xda4145a4975b1219e85a233673187309c4840044"},
-  {id:"18", address:"0x7bf03c63adfded079adbd9f807ccce0fd28b8fd8"},
-  {id:"19", address:"0x0016c4c602cc1a96a9d35fe133a7e374d3cdc26d"},
-  {id:"20", address:"0x0f8f4dcf1b6eb9f5c0e8fbb9cd6879aa3983c8bc"},
-  {id:"21", address:"0x491a412400840651c243acfc1ed9947ffe8a4e8f"},
-  {id:"22", address:"0x6f363e6760876a4c66730fbbefccdd3014b6220c"},
-  {id:"23", address:"0xefc128c4cb990a5ecc88ff71e9efcc0eaef434d2"},
-  {id:"24", address:"0x346e30b7ca273fb001eec84fabf2b693617df710"},
-  {id:"25", address:"0x0ab775634107063a7c16c6c8e0fd6bda1f219ae6"},
-  {id:"26", address:"0x0ffb7bd0bc009a01f9f9e95a0f563bad2189f151"},
-  {id:"27", address:"0xb0a3c31aae83526fd6ee75aac552822d676f46b2"},
-  {id:"28", address:"0xbb155716cd99d7ef8fd3fb45c91d39958c95b088"},
-  {id:"29", address:"0x85172e7ff5040366fa5a3caf7b1bd969bb06b570"},
+/* ══════════════════════════════════════════════
+   TOKENS — 32 tokens de CraftWorld en Ronin
+   Fuente: rawrtools.com + defined.fi
+══════════════════════════════════════════════ */
+const TOKENS = [
+  // address (contract)                           nombre          emoji   categoría
+  {addr:"0x8d896c96ffcafbf12d86dd4510236de7bcfa7dcf", name:"COIN",        em:"🪙", cat:"base"},
+  // Elementos base (pools especiales)
+  {addr:"0xe9c0995144a199241a5c46ccb7e7cd439af3ac75", name:"WATER",       em:"🌊", cat:"elemento"},
+  {addr:"0x48c29b0f4e16b3e4a71d5d7af95c97e7e5c47ab1", name:"FIRE",        em:"🔥", cat:"elemento"},
+  // Tierra — materiales básicos
+  {addr:"0xb287ea5a5cd4f2b74571e30fdec96241aa5163d9", name:"MUD",         em:"🟫", cat:"tierra"},
+  {addr:"0x8b1a1b7b43a53904b0a05406c13399079e553501", name:"CLAY",        em:"🧱", cat:"tierra"},
+  {addr:"0x6d8839a585f7877a5e218a217c07334980f04a4a", name:"SAND",        em:"🏖️", cat:"tierra"},
+  {addr:"0xa09dda31b854720b6d2f28dee9c87b05d0b80d14", name:"COPPER",      em:"🔶", cat:"tierra"},
+  {addr:"0xda4145a4975b1219e85a233673187309c4840044", name:"STONE",       em:"🪨", cat:"tierra"},
+  {addr:"0xfa3a564b27deb29781f80032df662a4406eebef6", name:"CERAMICS",    em:"🏺", cat:"tierra"},
+  {addr:"0x7aa1cc00ca62982ab10d12fd4f6b6687f33011ad", name:"GLASS",       em:"🪟", cat:"tierra"},
+  {addr:"0x70c063f17dacb35e4b3df06c8f36020416a44a3c", name:"STEEL",       em:"⚙️", cat:"tierra"},
+  {addr:"0x0016c4c602cc1a96a9d35fe133a7e374d3cdc26d", name:"SCREWS",      em:"🔩", cat:"tierra"},
+  {addr:"0x708804f7f9e3960e282fc1835ff55439319c1925", name:"BOLTS",       em:"🔧", cat:"tierra"},
+  {addr:"0x491a412400840651c243acfc1ed9947ffe8a4e8f", name:"CEMENT",      em:"🏗️", cat:"tierra"},
+  // Agua — materiales acuáticos
+  {addr:"0xd1d6bb059c97295f7437ad423111047cbcddf4c6", name:"SEAWATER",    em:"🫧", cat:"agua"},
+  {addr:"0xe63f8cefea9a17a259bb3b375929bd10d5e1cdfa", name:"ALGAE",       em:"🌿", cat:"agua"},
+  {addr:"0x0ab775634107063a7c16c6c8e0fd6bda1f219ae6", name:"PLASTICS",    em:"♻️", cat:"agua"},
+  {addr:"0x0ffb7bd0bc009a01f9f9e95a0f563bad2189f151", name:"FIBERGLASS",  em:"🧵", cat:"agua"},
+  {addr:"0xa09dda31b854720b6d2f28dee9c87b05d0b80d14", name:"OIL",         em:"🛢️", cat:"agua"},
+  // Fuego — materiales de calor
+  {addr:"0x6ccd01c951e57d82be8dccb90c01a58bfb4d83cd", name:"HEAT",        em:"🔥", cat:"fuego"},
+  {addr:"0x54ae64826ca9d440ede8c33e6cf4cfa1a3aa5801", name:"LAVA",        em:"🌋", cat:"fuego"},
+  {addr:"0x4343846ebe54dcd40ba572275640230d533296e5", name:"OXYGEN",      em:"💨", cat:"fuego"},
+  {addr:"0x4782e36bbe6e9abca5357d3e43a090fa772de71b", name:"GAS",         em:"⛽", cat:"fuego"},
+  {addr:"0x7bf03c63adfded079adbd9f807ccce0fd28b8fd8", name:"STEAM",       em:"♨️", cat:"fuego"},
+  {addr:"0x0f8f4dcf1b6eb9f5c0e8fbb9cd6879aa3983c8bc", name:"FUEL",        em:"🛢️", cat:"fuego"},
+  {addr:"0x6f363e6760876a4c66730fbbefccdd3014b6220c", name:"ACID",        em:"⚗️", cat:"fuego"},
+  {addr:"0x346e30b7ca273fb001eec84fabf2b693617df710", name:"SULFUR",      em:"🟡", cat:"fuego"},
+  {addr:"0xb0a3c31aae83526fd6ee75aac552822d676f46b2", name:"ENERGY",      em:"⚡", cat:"fuego"},
+  {addr:"0xbb155716cd99d7ef8fd3fb45c91d39958c95b088", name:"HYDROGEN",    em:"🫧", cat:"fuego"},
+  {addr:"0x85172e7ff5040366fa5a3caf7b1bd969bb06b570", name:"DYNAMITE",    em:"💥", cat:"fuego"},
+  // Especiales — llaves
+  {addr:"0x9b3b09e4e3339eb429292c0054f0ab97aed5bcc1", name:"KEY",         em:"🗝️", cat:"especial"},
+  {addr:"0x884a266b3c1e70cc32ed2af6483070e81b20830c", name:"CERAMIC_KEY", em:"🏺🗝️",cat:"especial"},
+  {addr:"0x7ac99f731a96ada40371fa2a4ec1527d0b6a48fb", name:"GLASS_KEY",   em:"🪟🗝️",cat:"especial"},
+  {addr:"0xb67521d41a2c499ceb1288e70563ca34618da866", name:"DYNO_KEY",    em:"🦖🗝️",cat:"especial"},
 ];
 
+const COIN_ADDR = "0x8d896c96ffcafbf12d86dd4510236de7bcfa7dcf";
+const GT_BASE   = "https://api.geckoterminal.com/api/v2/networks/ronin/tokens";
+const RECORDS_KEY = "cw_records_v4";
 const THREE_DAYS_MS = 3*24*60*60*1000;
-const RECORDS_KEY   = "cw_records_v3";
-const META_KEY      = "cw_meta_v3";
-const GT_API        = "https://api.geckoterminal.com/api/v2/networks/ronin/pools";
 
+const sleep    = ms => new Promise(r=>setTimeout(r,ms));
 const nowISO   = ()  => new Date().toISOString();
-const short    = a   => a.slice(0,6)+"…"+a.slice(-4);
 const fmtDate  = iso => new Date(iso).toLocaleDateString("es-ES",{day:"2-digit",month:"2-digit",year:"numeric"});
 const fmtTime  = iso => new Date(iso).toLocaleTimeString("es-ES",{hour:"2-digit",minute:"2-digit",second:"2-digit"});
-const purgeOld = arr => arr.filter(r=>Date.now()-new Date(r.timestamp).getTime()<THREE_DAYS_MS);
-const sleep    = ms  => new Promise(r=>setTimeout(r,ms));
+const purgeOld = arr => arr.filter(r=>Date.now()-new Date(r.ts).getTime()<THREE_DAYS_MS);
 
-function formatNum(n){
-  if(n==null) return "—";
+function fmtNum(n,digits=6){
+  if(n==null||isNaN(n)) return "—";
   const f=parseFloat(n);
-  if(!isFinite(f)) return "—";
-  if(f===0) return "0";
-  if(f<0.00001) return f.toExponential(4);
-  if(f<1)       return f.toPrecision(5);
-  if(f<1000)    return f.toFixed(4);
+  if(!isFinite(f)||f===0) return "0";
+  if(f<0.000001) return f.toExponential(3);
+  if(f<1)        return f.toPrecision(digits>4?5:4);
+  if(f<1000)     return f.toFixed(4);
   return f.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
 }
-function compactNum(n){
+function compact(n){
   const f=parseFloat(n);
   if(!isFinite(f)) return "—";
   if(f>=1e9) return (f/1e9).toFixed(2)+"B";
@@ -186,171 +154,170 @@ function compactNum(n){
   return f.toFixed(2);
 }
 
-const DB = {
-  get(key,fb=null){
-    try{const v=localStorage.getItem(key);return v?JSON.parse(v):fb;}catch{return fb;}
-  },
-  set(key,val){
-    try{localStorage.setItem(key,JSON.stringify(val));}
-    catch{
-      try{
-        const r=JSON.parse(localStorage.getItem(RECORDS_KEY)||"[]");
-        localStorage.setItem(RECORDS_KEY,JSON.stringify(purgeOld(r)));
-        localStorage.setItem(key,JSON.stringify(val));
-      }catch{}
-    }
-  },
+const DB={
+  get(k,fb=null){try{const v=localStorage.getItem(k);return v?JSON.parse(v):fb;}catch{return fb;}},
+  set(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch{try{const r=purgeOld(JSON.parse(localStorage.getItem(RECORDS_KEY)||"[]"));localStorage.setItem(RECORDS_KEY,JSON.stringify(r));localStorage.setItem(k,JSON.stringify(v));}catch{}}}
 };
 
-async function fetchPool(address){
+/* Fetch batch de hasta 30 tokens */
+async function fetchBatch(addresses){
+  const chunk=addresses.slice(0,30).join(",");
   try{
-    const res=await fetch(`${GT_API}/${address}`,{
-      headers:{Accept:"application/json;version=20230302"},
-      signal:AbortSignal.timeout(12000),
-    });
-    if(res.status===429) return {error:"Rate limit 429",attrs:null};
-    if(!res.ok)          return {error:`HTTP ${res.status}`,attrs:null};
+    const res=await fetch(`${GT_BASE}/multi/${chunk}`,{headers:{Accept:"application/json"},signal:AbortSignal.timeout(20000)});
+    if(!res.ok) return {};
     const json=await res.json();
-    const a=json?.data?.attributes;
-    if(!a) return {error:"Sin atributos",attrs:null};
-    return {error:null,attrs:a};
-  }catch(e){
-    return {error:e.name==="TimeoutError"?"Timeout":e.message,attrs:null};
-  }
+    const out={};
+    for(const item of json.data||[]){
+      const addr=item.attributes?.address?.toLowerCase();
+      const a=item.attributes;
+      if(!addr) continue;
+      out[addr]={
+        price_usd:  parseFloat(a.price_usd||0)||0,
+        vol_24h:    parseFloat(a.volume_usd?.h24||0)||0,
+        vol_1h:     parseFloat(a.volume_usd?.h1||0)||0,
+        chg_1h:     parseFloat(a.price_change_percentage?.h1||0)||0,
+        chg_24h:    parseFloat(a.price_change_percentage?.h24||0)||0,
+        fdv:        parseFloat(a.fdv_usd||0)||0,
+      };
+    }
+    return out;
+  }catch{return {};}
 }
 
-/* ════════════════════════════════════════════════════════
+/* ══════════════════════════════════════════════
    TRACKER PRINCIPAL
-════════════════════════════════════════════════════════ */
+══════════════════════════════════════════════ */
 function Tracker({ onLogout }) {
-  const [records,    setRecords   ]=useState([]);
-  const [poolMeta,   setPoolMeta  ]=useState({});
-  const [tab,        setTab       ]=useState("dashboard");
-  const [filterPool, setFilterPool]=useState("all");
-  const [fetching,   setFetching  ]=useState(false);
-  const [prog,       setProg      ]=useState({done:0,total:0});
-  const [autoMin,    setAutoMin   ]=useState(0);
-  const [lastFetch,  setLastFetch ]=useState(null);
-  const [status,     setStatus    ]=useState("");
-  const [loading,    setLoading   ]=useState(true);
-  const [search,     setSearch    ]=useState("");
+  const [prices,   setPrices  ]=useState({});       // addr -> data
+  const [records,  setRecords ]=useState([]);
+  const [fetching, setFetching]=useState(false);
+  const [prog,     setProg    ]=useState({done:0,total:0});
+  const [lastFetch,setLastFetch]=useState(null);
+  const [status,   setStatus  ]=useState("");
+  const [tab,      setTab     ]=useState("dashboard");
+  const [catFilter,setCatFilter]=useState("all");
+  const [search,   setSearch  ]=useState("");
+  const [autoMin,  setAutoMin ]=useState(0);
+  const [sortBy,   setSortBy  ]=useState("price_coin"); // price_coin | chg_24h | vol_24h
+  const [filterHist,setFilterHist]=useState("all");
   const iRef=useRef(null);
 
   useEffect(()=>{
     const r=DB.get(RECORDS_KEY,[]);
-    const m=DB.get(META_KEY,{});
     const clean=purgeOld(r);
-    setRecords(clean); setPoolMeta(m);
+    setRecords(clean);
     if(clean.length!==r.length) DB.set(RECORDS_KEY,clean);
-    setLoading(false);
+    // Restaurar último precio de localStorage
+    const last={};
+    clean.slice().reverse().forEach(rec=>{
+      if(!last[rec.addr]) last[rec.addr]=rec;
+    });
+    if(Object.keys(last).length) setPrices(last);
   },[]);
 
   useEffect(()=>{
     if(iRef.current) clearInterval(iRef.current);
-    if(autoMin>0) iRef.current=setInterval(()=>doFetchAll(),autoMin*60*1000);
+    if(autoMin>0) iRef.current=setInterval(doFetch,autoMin*60*1000);
     return ()=>clearInterval(iRef.current);
-  },[autoMin,records,poolMeta]);
+  },[autoMin]);
 
-  const doFetchAll=useCallback(async()=>{
+  const doFetch=useCallback(async()=>{
     if(fetching) return;
-    setFetching(true); setProg({done:0,total:POOLS.length}); setStatus("Consultando GeckoTerminal…");
-    const ts=nowISO();
-    const newMeta={...poolMeta};
-    const newRecs=[];
-    for(let i=0;i<POOLS.length;i++){
-      const pool=POOLS[i];
-      const {error,attrs}=await fetchPool(pool.address);
-      setProg({done:i+1,total:POOLS.length});
-      if(attrs){
-        const nm=attrs.name||short(pool.address);
-        newMeta[pool.address]={name:nm,base:nm.split(" / ")[0]||"T0",quote:nm.split(" / ")[1]||"T1"};
-        newRecs.push({
-          poolId:pool.id, address:pool.address, name:nm,
-          baseToken:nm.split(" / ")[0]||"T0", quoteToken:nm.split(" / ")[1]||"T1",
-          basePriceUsd:  attrs.base_token_price_usd||null,
-          quotePriceUsd: attrs.quote_token_price_usd||null,
-          priceNative:   attrs.base_token_price_native_currency||null,
-          volume1h:      attrs.volume_usd?.h1||null,
-          volume6h:      attrs.volume_usd?.h6||null,
-          volume24h:     attrs.volume_usd?.h24||null,
-          liquidity:     attrs.reserve_in_usd||null,
-          fdv:           attrs.fdv_usd||null,
-          mktCap:        attrs.market_cap_usd||null,
-          chg5m:         attrs.price_change_percentage?.m5||null,
-          chg1h:         attrs.price_change_percentage?.h1||null,
-          chg6h:         attrs.price_change_percentage?.h6||null,
-          chg24h:        attrs.price_change_percentage?.h24||null,
-          txBuys24h:     attrs.transactions?.h24?.buys||null,
-          txSells24h:    attrs.transactions?.h24?.sells||null,
-          txTotal24h:    ((attrs.transactions?.h24?.buys||0)+(attrs.transactions?.h24?.sells||0))||null,
-          timestamp:ts, error:null,
-        });
-      } else {
-        newRecs.push({
-          poolId:pool.id,address:pool.address,
-          name:newMeta[pool.address]?.name||short(pool.address),
-          basePriceUsd:null,quotePriceUsd:null,timestamp:ts,error,
-        });
-      }
-      if(i<POOLS.length-1) await sleep(250);
+    setFetching(true); setStatus("Consultando GeckoTerminal…");
+
+    const addrs=TOKENS.map(t=>t.addr);
+    // Hacemos en lotes de 30
+    const batches=[];
+    for(let i=0;i<addrs.length;i+=30) batches.push(addrs.slice(i,i+30));
+    setProg({done:0,total:batches.length});
+
+    const allData={};
+    for(let i=0;i<batches.length;i++){
+      const d=await fetchBatch(batches[i]);
+      Object.assign(allData,d);
+      setProg({done:i+1,total:batches.length});
+      if(i<batches.length-1) await sleep(600);
     }
+
+    const coinUsd=allData[COIN_ADDR]?.price_usd||0;
+    const ts=nowISO();
+    const newPrices={};
+    const newRecs=[];
+
+    for(const t of TOKENS){
+      const d=allData[t.addr.toLowerCase()]||allData[t.addr]||null;
+      const priceUsd=d?.price_usd||0;
+      const priceCoin=coinUsd>0&&priceUsd>0?(priceUsd/coinUsd):0;
+      newPrices[t.addr]={...d, price_usd:priceUsd, price_coin:priceCoin, coin_usd:coinUsd, ts};
+      newRecs.push({addr:t.addr,name:t.name,em:t.em,cat:t.cat,...(d||{}),price_usd:priceUsd,price_coin:priceCoin,coin_usd:coinUsd,ts});
+    }
+
+    setPrices(newPrices);
     const merged=purgeOld([...records,...newRecs]);
-    setRecords(merged); setPoolMeta(newMeta);
-    DB.set(RECORDS_KEY,merged); DB.set(META_KEY,newMeta);
+    setRecords(merged);
+    DB.set(RECORDS_KEY,merged);
     setLastFetch(ts);
-    const ok=newRecs.filter(r=>r.basePriceUsd!=null).length;
-    setStatus(`✅ ${ok}/${POOLS.length} pools OK · ${fmtDate(ts)} ${fmtTime(ts)}`);
+    const ok=Object.values(newPrices).filter(d=>d.price_usd>0).length;
+    setStatus(`✅ ${ok}/${TOKENS.length} tokens OK · ${fmtDate(ts)} ${fmtTime(ts)}`);
     setFetching(false);
-  },[fetching,records,poolMeta]);
+  },[fetching,records]);
 
-  const latestByPool=POOLS.map(pool=>{
-    const recs=records.filter(r=>r.poolId===pool.id).slice().reverse();
-    return {pool,latest:recs[0]||null,meta:poolMeta[pool.address],count:recs.length};
-  });
+  // Precio en COIN de cada token
+  const coinUsd=prices[COIN_ADDR]?.price_usd||0;
+  const tokensWithPrices=TOKENS.map(t=>({
+    ...t,
+    price_usd:   prices[t.addr]?.price_usd||0,
+    price_coin:  prices[t.addr]?.price_coin||0,
+    chg_24h:     prices[t.addr]?.chg_24h||0,
+    chg_1h:      prices[t.addr]?.chg_1h||0,
+    vol_24h:     prices[t.addr]?.vol_24h||0,
+    fdv:         prices[t.addr]?.fdv||0,
+    hasData:     (prices[t.addr]?.price_usd||0)>0,
+    ts:          prices[t.addr]?.ts||null,
+  }));
 
-  const filteredRecs=(filterPool==="all"?records:records.filter(r=>r.poolId===filterPool)).slice().reverse();
+  // Filtros dashboard
+  const visible=tokensWithPrices
+    .filter(t=>t.name!=="COIN")
+    .filter(t=>catFilter==="all"||t.cat===catFilter)
+    .filter(t=>!search||t.name.toLowerCase().includes(search.toLowerCase()))
+    .sort((a,b)=>{
+      if(sortBy==="chg_24h") return b.chg_24h-a.chg_24h;
+      if(sortBy==="vol_24h") return b.vol_24h-a.vol_24h;
+      return b.price_coin-a.price_coin;
+    });
 
-  const visiblePools=latestByPool.filter(({pool,meta})=>{
-    if(!search) return true;
-    const q=search.toLowerCase();
-    return (meta?.name||"").toLowerCase().includes(q)||pool.address.includes(q);
-  });
+  // Resumen
+  const sinCoin=tokensWithPrices.filter(t=>t.name!=="COIN"&&t.hasData);
+  const top3Up  =sinCoin.slice().sort((a,b)=>b.chg_24h-a.chg_24h).slice(0,3);
+  const top3Dn  =sinCoin.slice().sort((a,b)=>a.chg_24h-b.chg_24h).slice(0,3);
+  const top3Vol =sinCoin.slice().sort((a,b)=>b.vol_24h-a.vol_24h).slice(0,3);
+  const top3Price=sinCoin.slice().sort((a,b)=>b.price_coin-a.price_coin).slice(0,3);
 
-  const exportCSV=()=>{
-    const hdr=["Pool","Dirección","Token Base","Token Quote",
-      "Precio Base (USD)","Precio Quote (USD)","Precio Nativo",
-      "Vol 1h (USD)","Vol 6h (USD)","Vol 24h (USD)","Liquidez (USD)","FDV (USD)","Mkt Cap (USD)",
-      "Cambio 5m %","Cambio 1h %","Cambio 6h %","Cambio 24h %",
-      "Compras 24h","Ventas 24h","Txs Total 24h","Fecha","Hora","Error"];
-    const body=filteredRecs.map(r=>[
-      `"${r.name||""}"`,r.address,`"${r.baseToken||""}"`,`"${r.quoteToken||""}"`,
-      r.basePriceUsd||"",r.quotePriceUsd||"",r.priceNative||"",
-      r.volume1h||"",r.volume6h||"",r.volume24h||"",r.liquidity||"",r.fdv||"",r.mktCap||"",
-      r.chg5m||"",r.chg1h||"",r.chg6h||"",r.chg24h||"",
-      r.txBuys24h||"",r.txSells24h||"",r.txTotal24h||"",
-      fmtDate(r.timestamp),fmtTime(r.timestamp),`"${r.error||""}"`,
-    ].join(",")).join("\n");
-    const blob=new Blob(["\uFEFF"+hdr.join(",")+"\n"+body],{type:"text/csv;charset=utf-8;"});
-    const a=document.createElement("a");
-    a.href=URL.createObjectURL(blob);
-    a.download=`craftworld_${new Date().toISOString().slice(0,16).replace("T","_").replace(":","-")}.csv`;
-    a.click();
-  };
+  // Historial
+  const histRecs=(filterHist==="all"?records:records.filter(r=>r.name===filterHist)).slice().reverse();
 
   const pct=prog.total>0?Math.round(prog.done/prog.total*100):0;
 
-  if(loading) return (
-    <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",height:"100vh",gap:16}}>
-      <div style={{fontSize:72,animation:"glowHex 1.5s ease infinite"}}>⬡</div>
-      <p style={{color:"#2a3a4a",fontSize:13,letterSpacing:3}}>Cargando…</p>
-    </div>
-  );
-
-  const C = {
-    btn: {padding:"8px 16px",borderRadius:5,border:"none",fontSize:12,fontFamily:"'Courier New',monospace"},
-    th:  {background:"#09101d",color:"#2a4a5a",padding:"8px 10px",textAlign:"left",borderBottom:"1px solid #0e1e30",textTransform:"uppercase",letterSpacing:1,fontSize:9,whiteSpace:"nowrap"},
-    td:  {padding:"7px 10px",whiteSpace:"nowrap",fontSize:11},
+  const exportCSV=()=>{
+    const hdr=["Token","Categoría","Precio USD","Precio COIN","Cambio 1h %","Cambio 24h %","Vol 24h USD","FDV","Fecha","Hora"];
+    const body=histRecs.map(r=>[
+      r.name,r.cat,r.price_usd||"",r.price_coin||"",r.chg_1h||"",r.chg_24h||"",
+      r.vol_24h||"",r.fdv||"",fmtDate(r.ts),fmtTime(r.ts)
+    ].join(",")).join("\n");
+    const blob=new Blob(["\uFEFF"+hdr.join(",")+"\n"+body],{type:"text/csv;charset=utf-8;"});
+    const a=document.createElement("a"); a.href=URL.createObjectURL(blob);
+    a.download=`craftworld_${new Date().toISOString().slice(0,16).replace(/[:T]/g,"_")}.csv`;
+    a.click();
   };
+
+  const C={
+    btn:{padding:"8px 16px",borderRadius:5,border:"none",fontSize:12,fontFamily:"'Courier New',monospace"},
+    th:{background:"#09101d",color:"#2a4a5a",padding:"8px 10px",textAlign:"left",borderBottom:"1px solid #0e1e30",textTransform:"uppercase",letterSpacing:1,fontSize:9,whiteSpace:"nowrap"},
+    td:{padding:"7px 10px",whiteSpace:"nowrap",fontSize:11},
+  };
+
+  const CAT_LABELS={all:"Todos",base:"Base",elemento:"Elementos",tierra:"🌍 Tierra",agua:"💧 Agua",fuego:"🔥 Fuego",especial:"⭐ Especiales"};
 
   return (
     <div>
@@ -368,21 +335,22 @@ function Tracker({ onLogout }) {
           {fetching&&(
             <div style={{position:"relative",background:"#0c1a28",border:"1px solid #152840",borderRadius:5,height:22}}>
               <div style={{position:"absolute",inset:"0 auto 0 0",width:pct+"%",background:"linear-gradient(90deg,#00e5a0,#00c8ff)",borderRadius:5,transition:"width .4s"}}/>
-              <span style={{position:"absolute",width:"100%",textAlign:"center",top:3,fontSize:9,color:"#fff",mixBlendMode:"difference"}}>{prog.done}/{prog.total} · {pct}%</span>
+              <span style={{position:"absolute",width:"100%",textAlign:"center",top:3,fontSize:9,color:"#fff",mixBlendMode:"difference"}}>{prog.done}/{prog.total} lotes · {pct}%</span>
             </div>
+          )}
+          {coinUsd>0&&!fetching&&(
+            <div style={{fontSize:11,color:"#00e5a070"}}>🪙 1 COIN = <strong style={{color:"#00e5a0"}}>${fmtNum(coinUsd,8)}</strong></div>
           )}
         </div>
 
-        <div style={{display:"flex",alignItems:"center",gap:8}}>
+        <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
           {lastFetch&&!fetching&&<span style={{fontSize:9,color:"#2a3a4a"}}>🕐 {fmtDate(lastFetch)} {fmtTime(lastFetch)}</span>}
-          <button onClick={doFetchAll} disabled={fetching}
+          <button onClick={doFetch} disabled={fetching}
             style={{...C.btn,background:"#0d2a1a",color:"#00e5a0",border:"1px solid #00e5a030",fontWeight:"bold"}}>
             {fetching?"↻ Consultando…":"↻ Actualizar"}
           </button>
           <button onClick={()=>{sessionStorage.clear();onLogout();}}
-            style={{...C.btn,background:"#1a0d0d",color:"#ff6060",border:"1px solid #ff303020",fontSize:11}}>
-            ⎋ Salir
-          </button>
+            style={{...C.btn,background:"#1a0d0d",color:"#ff6060",border:"1px solid #ff303020"}}>⎋ Salir</button>
         </div>
       </header>
 
@@ -390,69 +358,91 @@ function Tracker({ onLogout }) {
 
       {/* TABS */}
       <nav style={{display:"flex",alignItems:"center",background:"#09101d",borderBottom:"1px solid #0e1e30",padding:"0 12px",overflowX:"auto"}}>
-        {[["dashboard","📊 Dashboard"],["history","📋 Historial"],["settings","⚙ Config"]].map(([id,lbl])=>(
+        {[["dashboard","📊 Dashboard"],["resumen","⚡ Resumen"],["history","📋 Historial"],["settings","⚙ Config"]].map(([id,lbl])=>(
           <button key={id} onClick={()=>setTab(id)}
             style={{background:"none",border:"none",color:tab===id?"#00e5a0":"#2a3a4a",padding:"10px 14px",fontSize:11,letterSpacing:1,borderBottom:tab===id?"2px solid #00e5a0":"2px solid transparent",transition:"all .2s",whiteSpace:"nowrap"}}>
             {lbl}
           </button>
         ))}
         <span style={{flex:1}}/>
-        <span style={{fontSize:9,color:"#111820",whiteSpace:"nowrap"}}>29 pools · Ronin · GeckoTerminal</span>
+        <span style={{fontSize:9,color:"#111820",whiteSpace:"nowrap"}}>{TOKENS.length} tokens · Ronin · GeckoTerminal</span>
       </nav>
 
-      <main style={{padding:"16px 16px 48px",maxWidth:1300,margin:"0 auto"}}>
+      <main style={{padding:"16px 16px 48px",maxWidth:1400,margin:"0 auto"}}>
 
         {/* ══ DASHBOARD ══ */}
         {tab==="dashboard"&&(
           <>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))",gap:10,marginBottom:14}}>
-              {[["Pools",POOLS.length],["Con datos",latestByPool.filter(x=>x.latest?.basePriceUsd!=null).length],["Registros (3d)",records.length],["Última consulta",lastFetch?fmtTime(lastFetch):"—"]].map(([l,v])=>(
+            {/* Stats rápidas */}
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))",gap:10,marginBottom:14}}>
+              {[
+                ["Tokens",TOKENS.length],
+                ["Con datos",tokensWithPrices.filter(t=>t.hasData).length],
+                ["1 COIN",coinUsd>0?"$"+fmtNum(coinUsd,6):"—"],
+                ["Registros",records.length],
+                ["Última actualiz.",lastFetch?fmtTime(lastFetch):"—"],
+              ].map(([l,v])=>(
                 <div key={l} style={{background:"#09101d",border:"1px solid #0e1e30",borderRadius:7,padding:"11px 13px"}}>
-                  <span style={{display:"block",fontSize:20,fontWeight:"bold",color:"#e8f4ff"}}>{v}</span>
+                  <span style={{display:"block",fontSize:18,fontWeight:"bold",color:"#e8f4ff",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{v}</span>
                   <span style={{display:"block",fontSize:8,color:"#2a3a4a",textTransform:"uppercase",letterSpacing:1,marginTop:2}}>{l}</span>
                 </div>
               ))}
             </div>
 
-            <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 Buscar pool…"
-              style={{width:"100%",background:"#09101d",border:"1px solid #0e1e30",color:"#b0c4d8",padding:"8px 13px",borderRadius:6,fontFamily:"monospace",fontSize:12,marginBottom:12,boxSizing:"border-box"}}/>
+            {/* Controles */}
+            <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:12,alignItems:"center"}}>
+              <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 Buscar token…"
+                style={{background:"#09101d",border:"1px solid #0e1e30",color:"#b0c4d8",padding:"7px 12px",borderRadius:5,fontFamily:"monospace",fontSize:11,minWidth:160}}/>
 
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(210px,1fr))",gap:10}}>
-              {visiblePools.map(({pool,latest,meta,count})=>{
-                const nm=meta?.name||latest?.name||short(pool.address);
-                const t0=nm.split(" / ")[0]||"?", t1=nm.split(" / ")[1]||"?";
-                const bp=latest?.basePriceUsd;
-                const chg=latest?.chg24h!=null?parseFloat(latest.chg24h):null;
-                const isUp=chg!=null&&chg>=0;
+              <select value={catFilter} onChange={e=>setCatFilter(e.target.value)}
+                style={{background:"#09101d",border:"1px solid #0e1e30",color:"#b0c4d8",padding:"7px 10px",borderRadius:5,fontFamily:"monospace",fontSize:11}}>
+                {Object.entries(CAT_LABELS).map(([k,v])=><option key={k} value={k}>{v}</option>)}
+              </select>
+
+              <select value={sortBy} onChange={e=>setSortBy(e.target.value)}
+                style={{background:"#09101d",border:"1px solid #0e1e30",color:"#b0c4d8",padding:"7px 10px",borderRadius:5,fontFamily:"monospace",fontSize:11}}>
+                <option value="price_coin">Ordenar: Precio COIN ↓</option>
+                <option value="chg_24h">Ordenar: Cambio 24h ↓</option>
+                <option value="vol_24h">Ordenar: Volumen 24h ↓</option>
+              </select>
+
+              <span style={{fontSize:10,color:"#2a3545",marginLeft:"auto"}}>{visible.length} tokens</span>
+            </div>
+
+            {/* Cards */}
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:10}}>
+              {visible.map(t=>{
+                const isUp=t.chg_24h>=0;
                 return (
-                  <div key={pool.id} className="pool-card"
-                    style={{background:"#09101d",border:`1px solid ${latest?.error&&!bp?"#2a1010":"#0e1e30"}`,borderRadius:7,padding:12,display:"flex",flexDirection:"column",gap:5}}>
-                    <div style={{display:"flex",alignItems:"center",gap:4}}>
-                      <span style={{background:"#0d2040",color:"#7ecff0",padding:"2px 6px",borderRadius:3,fontSize:9,fontWeight:"bold",maxWidth:70,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t0}</span>
-                      <span style={{background:"#1e1a06",color:"#c8a040",padding:"2px 6px",borderRadius:3,fontSize:9,fontWeight:"bold",maxWidth:70,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t1}</span>
-                      <span style={{marginLeft:"auto",fontSize:9,color:"#1a2535"}}>#{pool.id}</span>
+                  <div key={t.addr} className="pool-card"
+                    style={{background:"#09101d",border:"1px solid #0e1e30",borderRadius:7,padding:12,display:"flex",flexDirection:"column",gap:5}}>
+                    <div style={{display:"flex",alignItems:"center",gap:6}}>
+                      <span style={{fontSize:18}}>{t.em}</span>
+                      <span style={{fontWeight:"bold",color:"#e8f4ff",fontSize:13}}>{t.name}</span>
+                      <span style={{marginLeft:"auto",fontSize:8,background:{base:"#1a2a1a",elemento:"#1a1a3a",tierra:"#2a1a0a",agua:"#0a1a2a",fuego:"#2a0a0a",especial:"#1a0a2a"}[t.cat]||"#0e1e30",color:{base:"#00e5a0",elemento:"#6080ff",tierra:"#c87040",agua:"#4080c0",fuego:"#ff6040",especial:"#c040c0"}[t.cat]||"#5a8a9a",padding:"2px 6px",borderRadius:3,textTransform:"uppercase",letterSpacing:1}}>{t.cat}</span>
                     </div>
-                    <div style={{fontSize:10,color:"#5a8aaa",fontWeight:"bold",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{nm}</div>
-                    {bp!=null?(
+
+                    {t.hasData?(
                       <>
-                        <div style={{display:"flex",alignItems:"baseline",gap:6}}>
-                          <span style={{fontSize:17,fontWeight:"bold",color:"#e8f4ff"}}>${formatNum(bp)}</span>
-                          {chg!=null&&<span style={{fontSize:10,fontWeight:"bold",color:isUp?"#00e5a0":"#ff6060"}}>{isUp?"+":""}{chg.toFixed(2)}%</span>}
+                        <div style={{display:"flex",flexDirection:"column",gap:2}}>
+                          <div style={{display:"flex",alignItems:"baseline",gap:6}}>
+                            <span style={{fontSize:15,fontWeight:"bold",color:"#00e5a0"}}>{fmtNum(t.price_coin,5)} COIN</span>
+                          </div>
+                          <div style={{fontSize:10,color:"#3a5a6a"}}>${fmtNum(t.price_usd)}</div>
+                        </div>
+                        <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                          <span style={{fontSize:11,fontWeight:"bold",color:isUp?"#00e5a0":"#ff6060"}}>{isUp?"▲":"▼"} {Math.abs(t.chg_24h).toFixed(2)}%</span>
+                          <span style={{fontSize:9,color:"#2a3545"}}>24h</span>
+                          {t.chg_1h!==0&&<span style={{fontSize:9,color:t.chg_1h>=0?"#00a070":"#cc4040",marginLeft:"auto"}}>{t.chg_1h>=0?"+":""}{t.chg_1h.toFixed(2)}% 1h</span>}
                         </div>
                         <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
-                          {latest?.volume24h&&<span style={{fontSize:9,color:"#2a4a5a",background:"#0c1520",padding:"2px 5px",borderRadius:3}}>Vol: ${compactNum(latest.volume24h)}</span>}
-                          {latest?.liquidity&&<span style={{fontSize:9,color:"#2a4a5a",background:"#0c1520",padding:"2px 5px",borderRadius:3}}>Liq: ${compactNum(latest.liquidity)}</span>}
+                          {t.vol_24h>0&&<span style={{fontSize:9,color:"#2a4a5a",background:"#0c1520",padding:"2px 5px",borderRadius:3}}>Vol: ${compact(t.vol_24h)}</span>}
+                          {t.fdv>0&&<span style={{fontSize:9,color:"#2a4a5a",background:"#0c1520",padding:"2px 5px",borderRadius:3}}>FDV: ${compact(t.fdv)}</span>}
                         </div>
                       </>
-                    ):latest?.error?(
-                      <div style={{fontSize:10,color:"#cc5050",fontStyle:"italic"}}>⚠ {latest.error}</div>
                     ):(
-                      <div style={{fontSize:10,color:"#1e3040",fontStyle:"italic"}}>Sin datos aún</div>
+                      <div style={{fontSize:10,color:"#1e3040",fontStyle:"italic",padding:"8px 0"}}>Sin datos — presiona Actualizar</div>
                     )}
-                    <div style={{display:"flex",justifyContent:"space-between",borderTop:"1px solid #0e1e30",paddingTop:4,marginTop:1}}>
-                      <span style={{fontSize:8,color:"#1e3040"}}>{latest?`${fmtDate(latest.timestamp)} ${fmtTime(latest.timestamp)}`:""}</span>
-                      <span style={{fontSize:8,color:"#162030"}}>{count} reg.</span>
-                    </div>
                   </div>
                 );
               })}
@@ -460,48 +450,91 @@ function Tracker({ onLogout }) {
           </>
         )}
 
+        {/* ══ RESUMEN ══ */}
+        {tab==="resumen"&&(
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:14}}>
+            {[
+              {title:"🚀 Mayores subidas 24h", items:top3Up,  color:"#00e5a0", val:t=>`${t.chg_24h>=0?"+":""}${t.chg_24h.toFixed(2)}%`},
+              {title:"💀 Mayores bajas 24h",   items:top3Dn,  color:"#ff6060", val:t=>`${t.chg_24h.toFixed(2)}%`},
+              {title:"📦 Más volumen 24h",     items:top3Vol, color:"#7ecff0", val:t=>`$${compact(t.vol_24h)}`},
+              {title:"👑 Más caros en COIN",   items:top3Price,color:"#c8a040",val:t=>`${fmtNum(t.price_coin,4)} COIN`},
+            ].map(({title,items,color,val})=>(
+              <div key={title} style={{background:"#09101d",border:"1px solid #0e1e30",borderRadius:10,padding:16}}>
+                <div style={{fontSize:12,color:"#5a8aaa",letterSpacing:1,marginBottom:12,fontWeight:"bold"}}>{title}</div>
+                {items.length===0
+                  ?<div style={{color:"#1e3040",fontSize:11}}>Sin datos — presiona Actualizar</div>
+                  :items.map((t,i)=>(
+                    <div key={t.addr} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderBottom:i<items.length-1?"1px solid #0e1e30":"none"}}>
+                      <span style={{fontSize:10,color:"#2a3545",width:16}}>{i+1}.</span>
+                      <span style={{fontSize:18}}>{t.em}</span>
+                      <div style={{flex:1}}>
+                        <div style={{fontSize:12,fontWeight:"bold",color:"#e8f4ff"}}>{t.name}</div>
+                        <div style={{fontSize:10,color:"#3a5a6a"}}>{fmtNum(t.price_coin,4)} COIN · ${fmtNum(t.price_usd)}</div>
+                      </div>
+                      <span style={{fontSize:12,fontWeight:"bold",color}}>{val(t)}</span>
+                    </div>
+                  ))
+                }
+              </div>
+            ))}
+
+            {/* Tabla completa ordenada */}
+            <div style={{gridColumn:"1/-1",background:"#09101d",border:"1px solid #0e1e30",borderRadius:10,padding:16,overflowX:"auto"}}>
+              <div style={{fontSize:12,color:"#5a8aaa",letterSpacing:1,marginBottom:12,fontWeight:"bold"}}>📊 Todos los tokens ordenados por precio</div>
+              <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
+                <thead><tr>
+                  {["#","Token","Precio COIN","Precio USD","1h %","24h %","Vol 24h"].map(h=><th key={h} style={C.th}>{h}</th>)}
+                </tr></thead>
+                <tbody>
+                  {sinCoin.slice().sort((a,b)=>b.price_coin-a.price_coin).map((t,i)=>(
+                    <tr key={t.addr} style={{background:i%2===0?"#070b12":"#09101d"}}>
+                      <td style={{...C.td,color:"#2a3545"}}>{i+1}</td>
+                      <td style={C.td}><span style={{marginRight:6}}>{t.em}</span><strong style={{color:"#e8f4ff"}}>{t.name}</strong></td>
+                      <td style={{...C.td,color:"#00e5a0",fontWeight:"bold"}}>{fmtNum(t.price_coin,4)}</td>
+                      <td style={{...C.td,color:"#3a6a5a"}}>${fmtNum(t.price_usd)}</td>
+                      <td style={{...C.td,color:t.chg_1h>=0?"#00e5a0":"#ff6060"}}>{t.chg_1h>=0?"+":""}{t.chg_1h.toFixed(2)}%</td>
+                      <td style={{...C.td,color:t.chg_24h>=0?"#00e5a0":"#ff6060"}}>{t.chg_24h>=0?"+":""}{t.chg_24h.toFixed(2)}%</td>
+                      <td style={C.td}>{t.vol_24h>0?"$"+compact(t.vol_24h):"—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
         {/* ══ HISTORIAL ══ */}
         {tab==="history"&&(
           <>
             <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:12,flexWrap:"wrap"}}>
-              <select value={filterPool} onChange={e=>setFilterPool(e.target.value)}
+              <select value={filterHist} onChange={e=>setFilterHist(e.target.value)}
                 style={{background:"#09101d",border:"1px solid #0e1e30",color:"#b0c4d8",padding:"7px 10px",borderRadius:5,fontFamily:"monospace",fontSize:11}}>
-                <option value="all">Todas las pools (29)</option>
-                {POOLS.map(p=><option key={p.id} value={p.id}>#{p.id} — {poolMeta[p.address]?.name||short(p.address)}</option>)}
+                <option value="all">Todos los tokens</option>
+                {TOKENS.map(t=><option key={t.addr} value={t.name}>{t.em} {t.name}</option>)}
               </select>
               <button onClick={exportCSV} style={{...C.btn,background:"#0d2a1a",color:"#00e5a0",border:"1px solid #00e5a030"}}>⬇ Descargar CSV</button>
-              <span style={{fontSize:10,color:"#2a3a4a",marginLeft:"auto"}}>{filteredRecs.length} registros</span>
+              <span style={{fontSize:10,color:"#2a3a4a",marginLeft:"auto"}}>{histRecs.length} registros</span>
             </div>
-            {filteredRecs.length===0
-              ?<div style={{color:"#2a3a4a",textAlign:"center",padding:"60px 20px",lineHeight:2.2,fontSize:13}}>
-                Sin registros. Presiona <strong style={{color:"#00e5a0"}}>↻ Actualizar</strong>.
-              </div>
+            {histRecs.length===0
+              ?<div style={{color:"#2a3a4a",textAlign:"center",padding:"60px 20px",fontSize:13}}>Sin registros. Presiona <strong style={{color:"#00e5a0"}}>↻ Actualizar</strong>.</div>
               :<div style={{overflowX:"auto"}}>
                 <table style={{width:"100%",borderCollapse:"collapse",fontSize:11,fontFamily:"monospace"}}>
                   <thead><tr>
-                    {["#","Pool","Par","Precio Base USD","Vol 24h","Liquidez","24h %","Fecha","Hora","Estado"].map(h=>(
-                      <th key={h} style={C.th}>{h}</th>
-                    ))}
+                    {["Token","Precio COIN","Precio USD","1h %","24h %","Vol 24h","Fecha","Hora"].map(h=><th key={h} style={C.th}>{h}</th>)}
                   </tr></thead>
                   <tbody>
-                    {filteredRecs.map((r,i)=>{
-                      const chg=r.chg24h!=null?parseFloat(r.chg24h):null;
-                      const isUp=chg!=null&&chg>=0;
-                      return (
-                        <tr key={i} style={{background:i%2===0?"#070b12":"#09101d"}}>
-                          <td style={{...C.td,color:"#2a3545"}}>{filteredRecs.length-i}</td>
-                          <td style={C.td}><span style={{background:"#0d2040",color:"#7ecff0",padding:"2px 6px",borderRadius:3,fontSize:10}}>{r.name||short(r.address)}</span></td>
-                          <td style={{...C.td,color:"#556"}}>{r.baseToken||"—"}/{r.quoteToken||"—"}</td>
-                          <td style={{...C.td,color:"#00e5a0",fontWeight:"bold"}}>{r.basePriceUsd?"$"+formatNum(r.basePriceUsd):"—"}</td>
-                          <td style={C.td}>{r.volume24h?"$"+compactNum(r.volume24h):"—"}</td>
-                          <td style={C.td}>{r.liquidity?"$"+compactNum(r.liquidity):"—"}</td>
-                          <td style={{...C.td,color:chg!=null?(isUp?"#00e5a0":"#ff6060"):"inherit"}}>{chg!=null?(isUp?"+":"")+chg.toFixed(2)+"%":"—"}</td>
-                          <td style={{...C.td,color:"#556"}}>{fmtDate(r.timestamp)}</td>
-                          <td style={{...C.td,color:"#00e5a0"}}>{fmtTime(r.timestamp)}</td>
-                          <td style={C.td}>{r.error?<span style={{background:"#2a0d0d",color:"#ff6060",padding:"2px 6px",borderRadius:3}}>✕</span>:<span style={{background:"#0d2a1a",color:"#00e5a0",padding:"2px 6px",borderRadius:3}}>✓</span>}</td>
-                        </tr>
-                      );
-                    })}
+                    {histRecs.map((r,i)=>(
+                      <tr key={i} style={{background:i%2===0?"#070b12":"#09101d"}}>
+                        <td style={C.td}><span style={{marginRight:5}}>{r.em}</span><strong style={{color:"#e8f4ff"}}>{r.name}</strong></td>
+                        <td style={{...C.td,color:"#00e5a0",fontWeight:"bold"}}>{r.price_coin>0?fmtNum(r.price_coin,4):"—"}</td>
+                        <td style={{...C.td,color:"#3a6a5a"}}>{r.price_usd>0?"$"+fmtNum(r.price_usd):"—"}</td>
+                        <td style={{...C.td,color:(r.chg_1h||0)>=0?"#00e5a0":"#ff6060"}}>{r.chg_1h!=null?(r.chg_1h>=0?"+":"")+r.chg_1h.toFixed(2)+"%":"—"}</td>
+                        <td style={{...C.td,color:(r.chg_24h||0)>=0?"#00e5a0":"#ff6060"}}>{r.chg_24h!=null?(r.chg_24h>=0?"+":"")+r.chg_24h.toFixed(2)+"%":"—"}</td>
+                        <td style={C.td}>{r.vol_24h>0?"$"+compact(r.vol_24h):"—"}</td>
+                        <td style={{...C.td,color:"#445"}}>{fmtDate(r.ts)}</td>
+                        <td style={{...C.td,color:"#00e5a0"}}>{fmtTime(r.ts)}</td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>
@@ -515,7 +548,7 @@ function Tracker({ onLogout }) {
             <div style={{background:"#09101d",border:"1px solid #0e1e30",borderRadius:8,padding:18}}>
               <h3 style={{fontSize:11,color:"#5a9aaa",letterSpacing:2,textTransform:"uppercase",margin:"0 0 12px"}}>⏱ Auto-actualización</h3>
               <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-                {[[0,"Manual"],[5,"5 min"],[15,"15 min"],[30,"30 min"],[60,"1 h"],[360,"6 h"]].map(([v,l])=>(
+                {[[0,"Manual"],[5,"5 min"],[15,"15 min"],[30,"30 min"],[60,"1 h"]].map(([v,l])=>(
                   <button key={v} onClick={()=>setAutoMin(v)}
                     style={{...C.btn,background:autoMin===v?"#0d2a1a":"#070b12",border:autoMin===v?"1px solid #00e5a0":"1px solid #0e1e30",color:autoMin===v?"#00e5a0":"#2a4050"}}>
                     {l}
@@ -526,8 +559,8 @@ function Tracker({ onLogout }) {
             </div>
 
             <div style={{background:"#09101d",border:"1px solid #0e1e30",borderRadius:8,padding:18}}>
-              <h3 style={{fontSize:11,color:"#5a9aaa",letterSpacing:2,textTransform:"uppercase",margin:"0 0 12px"}}>🗄 Base de datos</h3>
-              {[["Pools","29"],["Registros guardados",records.length],["Retención","72 h (3 días)"],["Almacenamiento","localStorage (este navegador)"],["Red","Ronin Network"],["API","GeckoTerminal v2 (gratis)"]].map(([k,v])=>(
+              <h3 style={{fontSize:11,color:"#5a9aaa",letterSpacing:2,textTransform:"uppercase",margin:"0 0 12px"}}>🗄 Info</h3>
+              {[["Tokens","34"],["Retención historial","72h (3 días)"],["Almacenamiento","localStorage"],["Red","Ronin Network"],["API","GeckoTerminal v2 (gratis)"],["Fuente addresses","RAWRTools + Defined.fi"]].map(([k,v])=>(
                 <div key={k} style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid #0e1e30"}}>
                   <span style={{fontSize:12,color:"#445"}}>{k}</span>
                   <span style={{fontSize:12,color:"#7ecff0",fontFamily:"monospace"}}>{v}</span>
@@ -538,18 +571,16 @@ function Tracker({ onLogout }) {
             <div style={{background:"#09101d",border:"1px solid #0e1e30",borderRadius:8,padding:18}}>
               <h3 style={{fontSize:11,color:"#5a9aaa",letterSpacing:2,textTransform:"uppercase",margin:"0 0 12px"}}>🔐 Contraseña</h3>
               <p style={{fontSize:11,color:"#2a4050",lineHeight:1.8}}>
-                Para cambiar la contraseña, abrí el archivo <code style={{color:"#7ecff0"}}>index.html</code> con un editor de texto (Notepad, VS Code, etc.) y buscá la línea:<br/>
+                Abrí el archivo <code style={{color:"#7ecff0"}}>index.html</code> con un editor y buscá:<br/>
                 <code style={{color:"#00e5a0",display:"block",marginTop:6,padding:"6px 10px",background:"#070b12",borderRadius:4}}>const CW_PASSWORD = "craftworld2024";</code>
-                Reemplazá <code style={{color:"#c8a040"}}>craftworld2024</code> por tu nueva contraseña y volvé a subir el archivo a GitHub.
+                Reemplazá por tu nueva contraseña y volvé a subir el archivo.
               </p>
             </div>
 
-            <div style={{display:"flex",gap:8}}>
-              <button onClick={()=>{if(confirm("¿Borrar TODOS los registros?")){ setRecords([]); DB.set(RECORDS_KEY,[]); setStatus("🗑 Historial borrado."); }}}
-                style={{...C.btn,background:"#2a0d0d",color:"#ff6b6b",border:"1px solid #ff3a3a40",padding:"10px 18px"}}>
-                🗑 Borrar historial
-              </button>
-            </div>
+            <button onClick={()=>{if(confirm("¿Borrar TODOS los registros del historial?")){ setRecords([]); DB.set(RECORDS_KEY,[]); setStatus("🗑 Historial borrado."); }}}
+              style={{...C.btn,background:"#2a0d0d",color:"#ff6b6b",border:"1px solid #ff3a3a40",padding:"10px 18px",alignSelf:"flex-start"}}>
+              🗑 Borrar historial
+            </button>
           </div>
         )}
       </main>
@@ -557,12 +588,9 @@ function Tracker({ onLogout }) {
   );
 }
 
-/* ════════════════════════════════════════════════════════
-   ROOT: controla login vs app
-════════════════════════════════════════════════════════ */
 function Root() {
-  const [authed, setAuthed] = useState(window._cwAuth.check());
-  if (!authed) return <LoginScreen onAuth={()=>setAuthed(true)}/>;
+  const [authed,setAuthed]=useState(window._cwAuth.check());
+  if(!authed) return <LoginScreen onAuth={()=>setAuthed(true)}/>;
   return <Tracker onLogout={()=>setAuthed(false)}/>;
 }
 
