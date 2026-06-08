@@ -105,10 +105,8 @@ const TOKENS = [
   {pool:"0xb67521d41a2c499ceb1288e70563ca34618da866", name:"DYNO_KEY",    em:"🦖", cat:"especial", isCoin:false},
 ];
 
-const GT      = "https://api.geckoterminal.com/api/v2/networks/ronin/pools";
-const REC_KEY = "cw_records_v10";
-const THREE_D = 3*24*60*60*1000;
-const DELAY   = 2000; // 2 segundos entre cada token — seguro para rate limit
+const REC_KEY = "cw_records_v11";
+const THREE_D = 7*24*60*60*1000;
 
 const sleep   = ms=>new Promise(r=>setTimeout(r,ms));
 const nowISO  = ()=>new Date().toISOString();
@@ -140,55 +138,30 @@ const DB={
   }}
 };
 
-// Fetch de un pool — espera hasta recibir respuesta válida, reintenta en 429
-async function fetchPool(poolAddr){
-  for(let intento=0; intento<5; intento++){
-    try{
-      const r = await fetch(`${GT}/${poolAddr}`,{
-        headers:{Accept:"application/json;version=20230302"},
-        signal:AbortSignal.timeout(20000)
-      });
-      if(r.status===429){
-        // Rate limit — esperar y reintentar
-        const espera = 3000*(intento+1);
-        await sleep(espera);
-        continue;
-      }
-      if(!r.ok) return null;
-      const a = (await r.json())?.data?.attributes;
-      if(!a) return null;
-      return {
-        price_usd: parseFloat(a.base_token_price_usd||0)||0,
-        vol_24h:   parseFloat(a.volume_usd?.h24||0)||0,
-        vol_1h:    parseFloat(a.volume_usd?.h1||0)||0,
-        chg_24h:   parseFloat(a.price_change_percentage?.h24||0)||0,
-        chg_1h:    parseFloat(a.price_change_percentage?.h1||0)||0,
-        liquidity: parseFloat(a.reserve_in_usd||0)||0,
-        fdv:       parseFloat(a.fdv_usd||0)||0,
-        txs_24h:   (a.transactions?.h24?.buys||0)+(a.transactions?.h24?.sells||0),
-      };
-    }catch(e){
-      if(intento<4) await sleep(2000);
-    }
-  }
-  return null;
+// Carga prices.json generado por GitHub Actions cada hora
+async function loadPricesJson(){
+  const r = await fetch(`prices.json?t=${Date.now()}`, {
+    signal: AbortSignal.timeout(15000)
+  });
+  if(!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.json();
 }
 
 function Tracker({ onLogout }) {
   const [prices,    setPrices   ]=useState({});
   const [records,   setRecords  ]=useState([]);
   const [fetching,  setFetching ]=useState(false);
-  const [curIdx,    setCurIdx   ]=useState(-1);   // índice del token que se está consultando
   const [lastFetch, setLastFetch]=useState(null);
   const [status,    setStatus   ]=useState("");
   const [ok,        setOk       ]=useState(0);
   const [tab,       setTab      ]=useState("dashboard");
   const [catFilter, setCatFilter]=useState("all");
   const [search,    setSearch   ]=useState("");
-  const [autoMin,   setAutoMin  ]=useState(0);
+  const [autoMin,   setAutoMin  ]=useState(60);
   const [sortBy,    setSortBy   ]=useState("price_coin");
   const [filterHist,setFilterHist]=useState("all");
   const iRef=useRef(null);
+  const doFetchRef=useRef(null);
 
   useEffect(()=>{
     const r=purge(DB.get(REC_KEY,[]));
@@ -196,6 +169,8 @@ function Tracker({ onLogout }) {
     const last={};
     r.slice().reverse().forEach(rec=>{ if(!last[rec.pool]) last[rec.pool]=rec; });
     if(Object.keys(last).length) setPrices(last);
+    // Arrancar primera actualización automáticamente al abrir la página
+    setTimeout(()=>{ doFetchRef.current && doFetchRef.current(); }, 1500);
   },[]);
 
   useEffect(()=>{
@@ -207,56 +182,40 @@ function Tracker({ onLogout }) {
   const doFetch=useCallback(async()=>{
     if(fetching) return;
     setFetching(true);
-    setOk(0);
-    setCurIdx(0);
-    const ts = nowISO();
-    const newPrices = {};
-    let okCount = 0;
-
-    // Ordenar: primero los que NO tienen datos, luego los que sí
-    // Así en la siguiente actualización se priorizan los que fallaron
-    const sinDatos = TOKENS.filter(t => !prices[t.pool]?.price_usd);
-    const conDatos = TOKENS.filter(t =>  prices[t.pool]?.price_usd > 0);
-    const ordenado = [...sinDatos, ...conDatos];
-
-    for(let i=0; i<ordenado.length; i++){
-      const t = ordenado[i];
-      setCurIdx(i);
-      const etiqueta = !prices[t.pool]?.price_usd ? "⚠️ sin datos" : "✓";
-      setStatus(`${t.em} ${t.name} (${i+1}/${ordenado.length}) ${etiqueta}…`);
-
-      const d = await fetchPool(t.pool);
-
-      if(d){
-        newPrices[t.pool] = d;
-        okCount++;
-        setOk(okCount);
-        setPrices(prev=>({...prev,[t.pool]:d}));
+    setStatus("Cargando prices.json…");
+    try{
+      const json = await loadPricesJson();
+      // json.prices = { pool_addr: { price_usd, price_coin, coin_usd, chg_24h, ... } }
+      const newPrices = {};
+      for(const t of TOKENS){
+        const d = json.prices?.[t.pool];
+        if(d) newPrices[t.pool] = d;
       }
+      setPrices(newPrices);
 
-      if(i < ordenado.length-1){
-        await sleep(DELAY);
-      }
+      const ts = json.ts || nowISO();
+      const coinUsd = json.coin_usd || 0;
+      const newRecs = TOKENS.map(t=>{
+        const d   = newPrices[t.pool]||null;
+        const usd = d?.price_usd||0;
+        const coin= t.isCoin?1:(coinUsd>0&&usd>0?usd/coinUsd:0);
+        return {pool:t.pool,name:t.name,em:t.em,cat:t.cat,isCoin:t.isCoin,...(d||{}),price_usd:usd,price_coin:coin,coin_usd:coinUsd,ts};
+      });
+
+      const merged = purge([...records,...newRecs]);
+      setRecords(merged);
+      DB.set(REC_KEY,merged);
+      setLastFetch(ts);
+      setOk(json.ok||0);
+      setStatus(`✅ ${json.ok||0}/${json.total||TOKENS.length} tokens · ${fmtDate(ts)} ${fmtTime(ts)} · GitHub Actions`);
+    }catch(e){
+      setStatus(`❌ Error cargando prices.json: ${e.message}`);
     }
-
-    // Calcular price_coin y guardar historial
-    const coinT   = TOKENS.find(t=>t.isCoin);
-    const coinUsd = coinT && newPrices[coinT.pool]?.price_usd || 0;
-    const newRecs = TOKENS.map(t=>{
-      const d   = newPrices[t.pool]||null;
-      const usd = d?.price_usd||0;
-      const coin= t.isCoin ? 1 : (coinUsd>0&&usd>0 ? usd/coinUsd : 0);
-      return {pool:t.pool,name:t.name,em:t.em,cat:t.cat,isCoin:t.isCoin,...(d||{}),price_usd:usd,price_coin:coin,coin_usd:coinUsd,ts};
-    });
-
-    const merged = purge([...records,...newRecs]);
-    setRecords(merged);
-    DB.set(REC_KEY,merged);
-    setLastFetch(ts);
-    setCurIdx(-1);
-    setStatus(`✅ ${okCount}/${TOKENS.length} tokens OK · ${fmtDate(ts)} ${fmtTime(ts)}`);
     setFetching(false);
   },[fetching,records]);
+
+  // Mantener ref actualizada para poder llamar doFetch desde el mount useEffect
+  useEffect(()=>{ doFetchRef.current=doFetch; },[doFetch]);
 
   const coinUsd=(()=>{
     const ct=TOKENS.find(t=>t.isCoin);
@@ -290,7 +249,7 @@ function Tracker({ onLogout }) {
   const top3Vol  =sinCoin.slice().sort((a,b)=>b.vol_24h-a.vol_24h).slice(0,3);
   const top3Price=sinCoin.slice().sort((a,b)=>b.price_coin-a.price_coin).slice(0,3);
   const histRecs =(filterHist==="all"?records:records.filter(r=>r.name===filterHist)).slice().reverse();
-  const pct      =curIdx>=0?Math.round((curIdx)/TOKENS.length*100):fetching?99:0;
+  const pct      = fetching?99:0;
 
   const exportCSV=()=>{
     const hdr=["Token","Cat","Precio COIN","Precio USD","1h%","24h%","Vol24h","Liquidez","Txs","Fecha","Hora"];
@@ -309,8 +268,6 @@ function Tracker({ onLogout }) {
   const CC={base:"#00e5a0",elemento:"#6080ff",tierra:"#c87040",agua:"#4080c0",fuego:"#ff6040",especial:"#c040c0"};
   const CB={base:"#0d2a1a",elemento:"#0d0d2a",tierra:"#2a1a0a",agua:"#0a1a2a",fuego:"#2a0a0a",especial:"#1a0a2a"};
 
-  // Tiempo estimado restante
-  const secsLeft = curIdx>=0 ? Math.round((TOKENS.length-curIdx)*DELAY/1000) : 0;
 
   return (
     <div>
@@ -326,12 +283,11 @@ function Tracker({ onLogout }) {
           {fetching?(
             <div style={{display:"flex",flexDirection:"column",gap:4}}>
               <div style={{position:"relative",background:"#0c1a28",border:"1px solid #152840",borderRadius:5,height:22}}>
-                <div style={{position:"absolute",inset:"0 auto 0 0",width:pct+"%",background:"linear-gradient(90deg,#00e5a0,#00c8ff)",borderRadius:5,transition:"width .8s ease"}}/>
-                <span style={{position:"absolute",width:"100%",textAlign:"center",top:3,fontSize:9,color:"#fff",mixBlendMode:"difference"}}>
-                  {curIdx+1}/{TOKENS.length} tokens · {ok} ok · ~{secsLeft}s restantes
+                <div style={{position:"absolute",inset:0,background:"linear-gradient(90deg,#00e5a0,#00c8ff)",borderRadius:5,opacity:.3}}/>
+                <span style={{position:"absolute",width:"100%",textAlign:"center",top:3,fontSize:9,color:"#00e5a0"}}>
+                  ⏳ Cargando prices.json…
                 </span>
               </div>
-              <div style={{fontSize:9,color:"#2a5a4a",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{status}</div>
             </div>
           ):(
             coinUsd>0&&<div style={{fontSize:11,color:"#00e5a070"}}>🪙 1 COIN = <strong style={{color:"#00e5a0"}}>${fmtN(coinUsd,8)}</strong></div>
@@ -357,7 +313,7 @@ function Tracker({ onLogout }) {
           </button>
         ))}
         <span style={{flex:1}}/>
-        <span style={{fontSize:9,color:"#111820",whiteSpace:"nowrap"}}>{TOKENS.length} tokens · {DELAY/1000}s/token · GeckoTerminal</span>
+        <span style={{fontSize:9,color:"#111820",whiteSpace:"nowrap"}}>{TOKENS.length} tokens · GitHub Actions · cada 1h</span>
       </nav>
 
       <main style={{padding:"16px 16px 48px",maxWidth:1400,margin:"0 auto"}}>
@@ -424,9 +380,8 @@ function Tracker({ onLogout }) {
                       </div>
                     </>
                   ):(
-                    <div style={{fontSize:10,padding:"8px 0",fontStyle:"italic",
-                      color:isCurrent?"#00e5a060":fetching&&TOKENS.findIndex(tk=>tk.pool===t.pool)>curIdx?"#1a3a2a":"#1e3040"}}>
-                      {isCurrent?"↻ Consultando…":fetching&&TOKENS.findIndex(tk=>tk.pool===t.pool)>curIdx?"⏳ En cola…":"Sin datos"}
+                    <div style={{fontSize:10,padding:"8px 0",fontStyle:"italic",color:"#1e3040"}}>
+                      Sin datos
                     </div>
                   )}
                 </div>
@@ -524,26 +479,21 @@ function Tracker({ onLogout }) {
           <div style={{display:"flex",flexDirection:"column",gap:14,maxWidth:700}}>
             <div style={{background:"#09101d",border:"1px solid #0e1e30",borderRadius:8,padding:18}}>
               <h3 style={{fontSize:11,color:"#5a9aaa",letterSpacing:2,textTransform:"uppercase",margin:"0 0 12px"}}>⏱ Auto-actualización</h3>
-              <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-                {[[0,"Manual"],[15,"15 min"],[30,"30 min"],[60,"1 h"],[120,"2 h"]].map(([v,l])=>(
-                  <button key={v} onClick={()=>setAutoMin(v)}
-                    style={{...C.btn,background:autoMin===v?"#0d2a1a":"#070b12",border:autoMin===v?"1px solid #00e5a0":"1px solid #0e1e30",color:autoMin===v?"#00e5a0":"#2a4050"}}>
-                    {l}
-                  </button>
-                ))}
-              </div>
-              {autoMin>0&&<p style={{fontSize:11,color:"#2a4050",marginTop:8}}>✅ Auto-fetch cada <strong style={{color:"#00e5a0"}}>{autoMin} min</strong>. Mantén la pestaña abierta.</p>}
+                <p style={{fontSize:11,color:"#2a4050",lineHeight:1.8}}>
+                Auto-actualización fija cada <strong style={{color:"#00e5a0"}}>60 minutos</strong> mientras la pestaña esté abierta.<br/>
+                <span style={{color:"#1e3040"}}>La primera actualización arranca automáticamente al cargar la página.</span>
+              </p>
             </div>
             <div style={{background:"#09101d",border:"1px solid #0e1e30",borderRadius:8,padding:18}}>
               <h3 style={{fontSize:11,color:"#5a9aaa",letterSpacing:2,textTransform:"uppercase",margin:"0 0 12px"}}>🗄 Info técnica</h3>
               {[
-                ["API","GeckoTerminal /pools/{addr} (CORS ✅)"],
-                ["Estrategia","1 token por request, secuencial"],
-                ["Delay entre tokens",""+DELAY+"ms (respeta rate limit 30/min)"],
-                ["Reintento en 429","Hasta 5x con backoff progresivo"],
-                ["Tiempo total estimado",`~${Math.round(TOKENS.length*DELAY/1000)}s`],
+                ["Fuente de datos","prices.json (GitHub Actions)"],
+                ["Actualización","Cada hora automáticamente (cron)"],
+                ["Carga en web","Instantánea (lee prices.json)"],
+                ["Reintentos en script","Hasta 4x con backoff"],
+                ["Tiempo de carga web","< 1 segundo"],
                 ["Tokens",""+TOKENS.length],
-                ["Retención historial","72h (3 días)"],
+                ["Retención historial","7 días (borra los más antiguos)"],
                 ["Fuente addresses","RAWRTools · Defined.fi"],
               ].map(([k,v])=>(
                 <div key={k} style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid #0e1e30"}}>
