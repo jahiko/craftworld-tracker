@@ -13,12 +13,10 @@
     ::-webkit-scrollbar{width:4px;height:4px}
     ::-webkit-scrollbar-thumb{background:#1a2535;border-radius:2px}
     ::-webkit-scrollbar-track{background:transparent}
-    @keyframes spin{to{transform:rotate(360deg)}}
     @keyframes glowHex{0%,100%{color:#00e5a0;text-shadow:0 0 24px #00e5a060}50%{color:#00ffd0;text-shadow:0 0 48px #00ffd080}}
     @keyframes slideDown{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
     @keyframes fadeIn{from{opacity:0;transform:scale(.97)}to{opacity:1;transform:scale(1)}}
     @keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}
-    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
     .pool-card{transition:border-color .2s,transform .2s}
     .pool-card:hover{border-color:#00e5a030!important;transform:translateY(-2px)!important}
     button:hover:not(:disabled){opacity:.8;cursor:pointer}
@@ -29,24 +27,18 @@
 </head>
 <body>
 <div id="root"></div>
-
 <script>
-  const CW_PASSWORD = "craftworld2024"; // <── CAMBIA ESTO
+  const CW_PASSWORD = "craftworld2024";
   function simpleHash(s){let h=0;for(let i=0;i<s.length;i++){h=Math.imul(31,h)+s.charCodeAt(i)|0;}return h.toString(36);}
-  const EXPECTED=""; // se calcula en runtime
-  const SESSION_KEY="cw_session_v2";
+  const SESSION_KEY="cw_v6";
   window._cwAuth={
     check:()=>sessionStorage.getItem(SESSION_KEY)===simpleHash(CW_PASSWORD),
     login:(pass)=>{if(simpleHash(pass)===simpleHash(CW_PASSWORD)){sessionStorage.setItem(SESSION_KEY,simpleHash(CW_PASSWORD));return true;}return false;}
   };
 </script>
-
 <script type="text/babel">
-const { useState, useEffect, useRef, useCallback, useMemo } = React;
+const { useState, useEffect, useRef, useCallback } = React;
 
-/* ══════════════════════════════════════════════
-   LOGIN
-══════════════════════════════════════════════ */
 function LoginScreen({ onAuth }) {
   const [pass,setPass]=useState(""); const [error,setError]=useState(false); const [shake,setShake]=useState(false);
   const inputRef=useRef(null);
@@ -66,10 +58,7 @@ function LoginScreen({ onAuth }) {
         {error&&<div style={{background:"#2a0d0d",border:"1px solid #ff3a3a40",color:"#ff6060",fontSize:11,padding:"8px 14px",borderRadius:5,width:"100%",textAlign:"center",animation:"slideDown .3s ease"}}>⚠ Contraseña incorrecta</div>}
         <div style={{width:"100%",display:"flex",flexDirection:"column",gap:8}}>
           <label style={{fontSize:10,color:"#2a4a5a",textTransform:"uppercase",letterSpacing:1}}>Contraseña</label>
-          <input ref={inputRef} type="password" value={pass}
-            onChange={e=>{setPass(e.target.value);setError(false);}}
-            onKeyDown={e=>e.key==="Enter"&&attempt()}
-            placeholder="••••••••"
+          <input ref={inputRef} type="password" value={pass} onChange={e=>{setPass(e.target.value);setError(false);}} onKeyDown={e=>e.key==="Enter"&&attempt()} placeholder="••••••••"
             style={{width:"100%",background:"#070b12",border:`1px solid ${error?"#ff3a3a60":"#0e1e30"}`,color:"#e8f4ff",padding:"12px 14px",borderRadius:6,fontFamily:"'Courier New',monospace",fontSize:16,letterSpacing:4}}/>
         </div>
         <button onClick={attempt} style={{width:"100%",padding:13,borderRadius:6,border:"1px solid #00e5a040",background:"#0d2a1a",color:"#00e5a0",fontSize:13,fontFamily:"'Courier New',monospace",fontWeight:"bold",letterSpacing:2}}>ENTRAR →</button>
@@ -78,237 +67,238 @@ function LoginScreen({ onAuth }) {
   );
 }
 
-/* ══════════════════════════════════════════════
-   TOKENS — 32 tokens de CraftWorld en Ronin
-   Fuente: rawrtools.com + defined.fi
-══════════════════════════════════════════════ */
 const TOKENS = [
-  // address (contract)                           nombre          emoji   categoría
-  {addr:"0x8d896c96ffcafbf12d86dd4510236de7bcfa7dcf", name:"COIN",        em:"🪙", cat:"base"},
-  // Elementos base (pools especiales)
-  {addr:"0xe9c0995144a199241a5c46ccb7e7cd439af3ac75", name:"WATER",       em:"🌊", cat:"elemento"},
-  {addr:"0x48c29b0f4e16b3e4a71d5d7af95c97e7e5c47ab1", name:"FIRE",        em:"🔥", cat:"elemento"},
-  // Tierra — materiales básicos
-  {addr:"0xb287ea5a5cd4f2b74571e30fdec96241aa5163d9", name:"MUD",         em:"🟫", cat:"tierra"},
-  {addr:"0x8b1a1b7b43a53904b0a05406c13399079e553501", name:"CLAY",        em:"🧱", cat:"tierra"},
-  {addr:"0x6d8839a585f7877a5e218a217c07334980f04a4a", name:"SAND",        em:"🏖️", cat:"tierra"},
-  {addr:"0xa09dda31b854720b6d2f28dee9c87b05d0b80d14", name:"COPPER",      em:"🔶", cat:"tierra"},
-  {addr:"0xda4145a4975b1219e85a233673187309c4840044", name:"STONE",       em:"🪨", cat:"tierra"},
-  {addr:"0xfa3a564b27deb29781f80032df662a4406eebef6", name:"CERAMICS",    em:"🏺", cat:"tierra"},
-  {addr:"0x7aa1cc00ca62982ab10d12fd4f6b6687f33011ad", name:"GLASS",       em:"🪟", cat:"tierra"},
-  {addr:"0x70c063f17dacb35e4b3df06c8f36020416a44a3c", name:"STEEL",       em:"⚙️", cat:"tierra"},
-  {addr:"0x0016c4c602cc1a96a9d35fe133a7e374d3cdc26d", name:"SCREWS",      em:"🔩", cat:"tierra"},
-  {addr:"0x708804f7f9e3960e282fc1835ff55439319c1925", name:"BOLTS",       em:"🔧", cat:"tierra"},
-  {addr:"0x491a412400840651c243acfc1ed9947ffe8a4e8f", name:"CEMENT",      em:"🏗️", cat:"tierra"},
-  // Agua — materiales acuáticos
-  {addr:"0xd1d6bb059c97295f7437ad423111047cbcddf4c6", name:"SEAWATER",    em:"🫧", cat:"agua"},
-  {addr:"0xe63f8cefea9a17a259bb3b375929bd10d5e1cdfa", name:"ALGAE",       em:"🌿", cat:"agua"},
-  {addr:"0x0ab775634107063a7c16c6c8e0fd6bda1f219ae6", name:"PLASTICS",    em:"♻️", cat:"agua"},
-  {addr:"0x0ffb7bd0bc009a01f9f9e95a0f563bad2189f151", name:"FIBERGLASS",  em:"🧵", cat:"agua"},
-  {addr:"0xa09dda31b854720b6d2f28dee9c87b05d0b80d14", name:"OIL",         em:"🛢️", cat:"agua"},
-  // Fuego — materiales de calor
-  {addr:"0x6ccd01c951e57d82be8dccb90c01a58bfb4d83cd", name:"HEAT",        em:"🔥", cat:"fuego"},
-  {addr:"0x54ae64826ca9d440ede8c33e6cf4cfa1a3aa5801", name:"LAVA",        em:"🌋", cat:"fuego"},
-  {addr:"0x4343846ebe54dcd40ba572275640230d533296e5", name:"OXYGEN",      em:"💨", cat:"fuego"},
-  {addr:"0x4782e36bbe6e9abca5357d3e43a090fa772de71b", name:"GAS",         em:"⛽", cat:"fuego"},
-  {addr:"0x7bf03c63adfded079adbd9f807ccce0fd28b8fd8", name:"STEAM",       em:"♨️", cat:"fuego"},
-  {addr:"0x0f8f4dcf1b6eb9f5c0e8fbb9cd6879aa3983c8bc", name:"FUEL",        em:"🛢️", cat:"fuego"},
-  {addr:"0x6f363e6760876a4c66730fbbefccdd3014b6220c", name:"ACID",        em:"⚗️", cat:"fuego"},
-  {addr:"0x346e30b7ca273fb001eec84fabf2b693617df710", name:"SULFUR",      em:"🟡", cat:"fuego"},
-  {addr:"0xb0a3c31aae83526fd6ee75aac552822d676f46b2", name:"ENERGY",      em:"⚡", cat:"fuego"},
-  {addr:"0xbb155716cd99d7ef8fd3fb45c91d39958c95b088", name:"HYDROGEN",    em:"🫧", cat:"fuego"},
-  {addr:"0x85172e7ff5040366fa5a3caf7b1bd969bb06b570", name:"DYNAMITE",    em:"💥", cat:"fuego"},
-  // Especiales — llaves
-  {addr:"0x9b3b09e4e3339eb429292c0054f0ab97aed5bcc1", name:"KEY",         em:"🗝️", cat:"especial"},
-  {addr:"0x884a266b3c1e70cc32ed2af6483070e81b20830c", name:"CERAMIC_KEY", em:"🏺🗝️",cat:"especial"},
-  {addr:"0x7ac99f731a96ada40371fa2a4ec1527d0b6a48fb", name:"GLASS_KEY",   em:"🪟🗝️",cat:"especial"},
-  {addr:"0xb67521d41a2c499ceb1288e70563ca34618da866", name:"DYNO_KEY",    em:"🦖🗝️",cat:"especial"},
+  {pool:"0xda021b3d91f82bf2bcfc1a8709545c3a643d47de", name:"COIN",        em:"🪙", cat:"base",     isCoin:true },
+  {pool:"0xf14ad4a21a9e71ba967b8b99e278d03a1933b44a", name:"WATER",       em:"🌊", cat:"elemento", isCoin:false},
+  {pool:"0xc356cd52364541379ad4d31a889b7031e758220a", name:"FIRE",        em:"🔥", cat:"elemento", isCoin:false},
+  {pool:"0xe973dc221bb031010ec673105ed8b04c9e713b9d", name:"EARTH",       em:"🌍", cat:"elemento", isCoin:false},
+  {pool:"0xb287ea5a5cd4f2b74571e30fdec96241aa5163d9", name:"MUD",         em:"🟫", cat:"tierra",   isCoin:false},
+  {pool:"0x8b1a1b7b43a53904b0a05406c13399079e553501", name:"CLAY",        em:"🧱", cat:"tierra",   isCoin:false},
+  {pool:"0x6d8839a585f7877a5e218a217c07334980f04a4a", name:"SAND",        em:"🏖️", cat:"tierra",   isCoin:false},
+  {pool:"0xa09dda31b854720b6d2f28dee9c87b05d0b80d14", name:"COPPER",      em:"🔶", cat:"tierra",   isCoin:false},
+  {pool:"0xda4145a4975b1219e85a233673187309c4840044", name:"STONE",       em:"🪨", cat:"tierra",   isCoin:false},
+  {pool:"0xfa3a564b27deb29781f80032df662a4406eebef6", name:"CERAMICS",    em:"🏺", cat:"tierra",   isCoin:false},
+  {pool:"0x7aa1cc00ca62982ab10d12fd4f6b6687f33011ad", name:"GLASS",       em:"🪟", cat:"tierra",   isCoin:false},
+  {pool:"0x70c063f17dacb35e4b3df06c8f36020416a44a3c", name:"STEEL",       em:"⚙️", cat:"tierra",   isCoin:false},
+  {pool:"0x0016c4c602cc1a96a9d35fe133a7e374d3cdc26d", name:"SCREWS",      em:"🔩", cat:"tierra",   isCoin:false},
+  {pool:"0x708804f7f9e3960e282fc1835ff55439319c1925", name:"BOLTS",       em:"🔧", cat:"tierra",   isCoin:false},
+  {pool:"0x491a412400840651c243acfc1ed9947ffe8a4e8f", name:"CEMENT",      em:"🏗️", cat:"tierra",   isCoin:false},
+  {pool:"0xd1d6bb059c97295f7437ad423111047cbcddf4c6", name:"SEAWATER",    em:"🫧", cat:"agua",     isCoin:false},
+  {pool:"0xe63f8cefea9a17a259bb3b375929bd10d5e1cdfa", name:"ALGAE",       em:"🌿", cat:"agua",     isCoin:false},
+  {pool:"0x0ab775634107063a7c16c6c8e0fd6bda1f219ae6", name:"PLASTICS",    em:"♻️", cat:"agua",     isCoin:false},
+  {pool:"0x0ffb7bd0bc009a01f9f9e95a0f563bad2189f151", name:"FIBERGLASS",  em:"🧵", cat:"agua",     isCoin:false},
+  {pool:"0x6f363e6760876a4c66730fbbefccdd3014b6220c", name:"OIL",         em:"🛢️", cat:"agua",     isCoin:false},
+  {pool:"0x6ccd01c951e57d82be8dccb90c01a58bfb4d83cd", name:"HEAT",        em:"🌡️", cat:"fuego",    isCoin:false},
+  {pool:"0x54ae64826ca9d440ede8c33e6cf4cfa1a3aa5801", name:"LAVA",        em:"🌋", cat:"fuego",    isCoin:false},
+  {pool:"0x4343846ebe54dcd40ba572275640230d533296e5", name:"OXYGEN",      em:"💨", cat:"fuego",    isCoin:false},
+  {pool:"0x4782e36bbe6e9abca5357d3e43a090fa772de71b", name:"GAS",         em:"⛽", cat:"fuego",    isCoin:false},
+  {pool:"0x7bf03c63adfded079adbd9f807ccce0fd28b8fd8", name:"STEAM",       em:"♨️", cat:"fuego",    isCoin:false},
+  {pool:"0x0f8f4dcf1b6eb9f5c0e8fbb9cd6879aa3983c8bc", name:"FUEL",        em:"⚡", cat:"fuego",    isCoin:false},
+  {pool:"0xefc128c4cb990a5ecc88ff71e9efcc0eaef434d2", name:"ACID",        em:"⚗️", cat:"fuego",    isCoin:false},
+  {pool:"0x346e30b7ca273fb001eec84fabf2b693617df710", name:"SULFUR",      em:"🟡", cat:"fuego",    isCoin:false},
+  {pool:"0xb0a3c31aae83526fd6ee75aac552822d676f46b2", name:"ENERGY",      em:"⚡", cat:"fuego",    isCoin:false},
+  {pool:"0xbb155716cd99d7ef8fd3fb45c91d39958c95b088", name:"HYDROGEN",    em:"🫧", cat:"fuego",    isCoin:false},
+  {pool:"0x85172e7ff5040366fa5a3caf7b1bd969bb06b570", name:"DYNAMITE",    em:"💥", cat:"fuego",    isCoin:false},
+  {pool:"0x9b3b09e4e3339eb429292c0054f0ab97aed5bcc1", name:"KEY",         em:"🗝️", cat:"especial", isCoin:false},
+  {pool:"0x884a266b3c1e70cc32ed2af6483070e81b20830c", name:"CERAMIC_KEY", em:"🏺", cat:"especial", isCoin:false},
+  {pool:"0x7ac99f731a96ada40371fa2a4ec1527d0b6a48fb", name:"GLASS_KEY",   em:"🪟", cat:"especial", isCoin:false},
+  {pool:"0xb67521d41a2c499ceb1288e70563ca34618da866", name:"DYNO_KEY",    em:"🦖", cat:"especial", isCoin:false},
 ];
 
-const COIN_ADDR = "0x8d896c96ffcafbf12d86dd4510236de7bcfa7dcf";
-const GT_BASE   = "https://api.geckoterminal.com/api/v2/networks/ronin/tokens";
-const RECORDS_KEY = "cw_records_v4";
-const THREE_DAYS_MS = 3*24*60*60*1000;
+const GT      = "https://api.geckoterminal.com/api/v2/networks/ronin/pools";
+const REC_KEY = "cw_records_v10";
+const THREE_D = 3*24*60*60*1000;
+const DELAY   = 2000; // 2 segundos entre cada token — seguro para rate limit
 
-const sleep    = ms => new Promise(r=>setTimeout(r,ms));
-const nowISO   = ()  => new Date().toISOString();
-const fmtDate  = iso => new Date(iso).toLocaleDateString("es-ES",{day:"2-digit",month:"2-digit",year:"numeric"});
-const fmtTime  = iso => new Date(iso).toLocaleTimeString("es-ES",{hour:"2-digit",minute:"2-digit",second:"2-digit"});
-const purgeOld = arr => arr.filter(r=>Date.now()-new Date(r.ts).getTime()<THREE_DAYS_MS);
+const sleep   = ms=>new Promise(r=>setTimeout(r,ms));
+const nowISO  = ()=>new Date().toISOString();
+const fmtDate = iso=>new Date(iso).toLocaleDateString("es-ES",{day:"2-digit",month:"2-digit",year:"numeric"});
+const fmtTime = iso=>new Date(iso).toLocaleTimeString("es-ES",{hour:"2-digit",minute:"2-digit",second:"2-digit"});
+const purge   = arr=>arr.filter(r=>Date.now()-new Date(r.ts).getTime()<THREE_D);
 
-function fmtNum(n,digits=6){
-  if(n==null||isNaN(n)) return "—";
+function fmtN(n,d=4){
+  if(!n&&n!==0) return "—";
   const f=parseFloat(n);
   if(!isFinite(f)||f===0) return "0";
   if(f<0.000001) return f.toExponential(3);
-  if(f<1)        return f.toPrecision(digits>4?5:4);
-  if(f<1000)     return f.toFixed(4);
+  if(f<1) return f.toPrecision(5);
+  if(f<1000) return f.toFixed(d);
   return f.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
 }
-function compact(n){
+function cmpct(n){
   const f=parseFloat(n);
-  if(!isFinite(f)) return "—";
+  if(!isFinite(f)||f<=0) return "—";
   if(f>=1e9) return (f/1e9).toFixed(2)+"B";
   if(f>=1e6) return (f/1e6).toFixed(2)+"M";
   if(f>=1e3) return (f/1e3).toFixed(2)+"K";
   return f.toFixed(2);
 }
-
 const DB={
   get(k,fb=null){try{const v=localStorage.getItem(k);return v?JSON.parse(v):fb;}catch{return fb;}},
-  set(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch{try{const r=purgeOld(JSON.parse(localStorage.getItem(RECORDS_KEY)||"[]"));localStorage.setItem(RECORDS_KEY,JSON.stringify(r));localStorage.setItem(k,JSON.stringify(v));}catch{}}}
+  set(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch{
+    try{localStorage.setItem(REC_KEY,JSON.stringify(purge(DB.get(REC_KEY,[]))));localStorage.setItem(k,JSON.stringify(v));}catch{}
+  }}
 };
 
-/* Fetch batch de hasta 30 tokens */
-async function fetchBatch(addresses){
-  const chunk=addresses.slice(0,30).join(",");
-  try{
-    const res=await fetch(`${GT_BASE}/multi/${chunk}`,{headers:{Accept:"application/json"},signal:AbortSignal.timeout(20000)});
-    if(!res.ok) return {};
-    const json=await res.json();
-    const out={};
-    for(const item of json.data||[]){
-      const addr=item.attributes?.address?.toLowerCase();
-      const a=item.attributes;
-      if(!addr) continue;
-      out[addr]={
-        price_usd:  parseFloat(a.price_usd||0)||0,
-        vol_24h:    parseFloat(a.volume_usd?.h24||0)||0,
-        vol_1h:     parseFloat(a.volume_usd?.h1||0)||0,
-        chg_1h:     parseFloat(a.price_change_percentage?.h1||0)||0,
-        chg_24h:    parseFloat(a.price_change_percentage?.h24||0)||0,
-        fdv:        parseFloat(a.fdv_usd||0)||0,
+// Fetch de un pool — espera hasta recibir respuesta válida, reintenta en 429
+async function fetchPool(poolAddr){
+  for(let intento=0; intento<5; intento++){
+    try{
+      const r = await fetch(`${GT}/${poolAddr}`,{
+        headers:{Accept:"application/json;version=20230302"},
+        signal:AbortSignal.timeout(20000)
+      });
+      if(r.status===429){
+        // Rate limit — esperar y reintentar
+        const espera = 3000*(intento+1);
+        await sleep(espera);
+        continue;
+      }
+      if(!r.ok) return null;
+      const a = (await r.json())?.data?.attributes;
+      if(!a) return null;
+      return {
+        price_usd: parseFloat(a.base_token_price_usd||0)||0,
+        vol_24h:   parseFloat(a.volume_usd?.h24||0)||0,
+        vol_1h:    parseFloat(a.volume_usd?.h1||0)||0,
+        chg_24h:   parseFloat(a.price_change_percentage?.h24||0)||0,
+        chg_1h:    parseFloat(a.price_change_percentage?.h1||0)||0,
+        liquidity: parseFloat(a.reserve_in_usd||0)||0,
+        fdv:       parseFloat(a.fdv_usd||0)||0,
+        txs_24h:   (a.transactions?.h24?.buys||0)+(a.transactions?.h24?.sells||0),
       };
+    }catch(e){
+      if(intento<4) await sleep(2000);
     }
-    return out;
-  }catch{return {};}
+  }
+  return null;
 }
 
-/* ══════════════════════════════════════════════
-   TRACKER PRINCIPAL
-══════════════════════════════════════════════ */
 function Tracker({ onLogout }) {
-  const [prices,   setPrices  ]=useState({});       // addr -> data
-  const [records,  setRecords ]=useState([]);
-  const [fetching, setFetching]=useState(false);
-  const [prog,     setProg    ]=useState({done:0,total:0});
-  const [lastFetch,setLastFetch]=useState(null);
-  const [status,   setStatus  ]=useState("");
-  const [tab,      setTab     ]=useState("dashboard");
-  const [catFilter,setCatFilter]=useState("all");
-  const [search,   setSearch  ]=useState("");
-  const [autoMin,  setAutoMin ]=useState(0);
-  const [sortBy,   setSortBy  ]=useState("price_coin"); // price_coin | chg_24h | vol_24h
+  const [prices,    setPrices   ]=useState({});
+  const [records,   setRecords  ]=useState([]);
+  const [fetching,  setFetching ]=useState(false);
+  const [curIdx,    setCurIdx   ]=useState(-1);   // índice del token que se está consultando
+  const [lastFetch, setLastFetch]=useState(null);
+  const [status,    setStatus   ]=useState("");
+  const [ok,        setOk       ]=useState(0);
+  const [tab,       setTab      ]=useState("dashboard");
+  const [catFilter, setCatFilter]=useState("all");
+  const [search,    setSearch   ]=useState("");
+  const [autoMin,   setAutoMin  ]=useState(0);
+  const [sortBy,    setSortBy   ]=useState("price_coin");
   const [filterHist,setFilterHist]=useState("all");
   const iRef=useRef(null);
 
   useEffect(()=>{
-    const r=DB.get(RECORDS_KEY,[]);
-    const clean=purgeOld(r);
-    setRecords(clean);
-    if(clean.length!==r.length) DB.set(RECORDS_KEY,clean);
-    // Restaurar último precio de localStorage
+    const r=purge(DB.get(REC_KEY,[]));
+    setRecords(r);
     const last={};
-    clean.slice().reverse().forEach(rec=>{
-      if(!last[rec.addr]) last[rec.addr]=rec;
-    });
+    r.slice().reverse().forEach(rec=>{ if(!last[rec.pool]) last[rec.pool]=rec; });
     if(Object.keys(last).length) setPrices(last);
   },[]);
 
   useEffect(()=>{
     if(iRef.current) clearInterval(iRef.current);
     if(autoMin>0) iRef.current=setInterval(doFetch,autoMin*60*1000);
-    return ()=>clearInterval(iRef.current);
+    return()=>clearInterval(iRef.current);
   },[autoMin]);
 
   const doFetch=useCallback(async()=>{
     if(fetching) return;
-    setFetching(true); setStatus("Consultando GeckoTerminal…");
+    setFetching(true);
+    setOk(0);
+    setCurIdx(0);
+    const ts = nowISO();
+    const newPrices = {};
+    let okCount = 0;
 
-    const addrs=TOKENS.map(t=>t.addr);
-    // Hacemos en lotes de 30
-    const batches=[];
-    for(let i=0;i<addrs.length;i+=30) batches.push(addrs.slice(i,i+30));
-    setProg({done:0,total:batches.length});
+    // Ordenar: primero los que NO tienen datos, luego los que sí
+    // Así en la siguiente actualización se priorizan los que fallaron
+    const sinDatos = TOKENS.filter(t => !prices[t.pool]?.price_usd);
+    const conDatos = TOKENS.filter(t =>  prices[t.pool]?.price_usd > 0);
+    const ordenado = [...sinDatos, ...conDatos];
 
-    const allData={};
-    for(let i=0;i<batches.length;i++){
-      const d=await fetchBatch(batches[i]);
-      Object.assign(allData,d);
-      setProg({done:i+1,total:batches.length});
-      if(i<batches.length-1) await sleep(600);
+    for(let i=0; i<ordenado.length; i++){
+      const t = ordenado[i];
+      setCurIdx(i);
+      const etiqueta = !prices[t.pool]?.price_usd ? "⚠️ sin datos" : "✓";
+      setStatus(`${t.em} ${t.name} (${i+1}/${ordenado.length}) ${etiqueta}…`);
+
+      const d = await fetchPool(t.pool);
+
+      if(d){
+        newPrices[t.pool] = d;
+        okCount++;
+        setOk(okCount);
+        setPrices(prev=>({...prev,[t.pool]:d}));
+      }
+
+      if(i < ordenado.length-1){
+        await sleep(DELAY);
+      }
     }
 
-    const coinUsd=allData[COIN_ADDR]?.price_usd||0;
-    const ts=nowISO();
-    const newPrices={};
-    const newRecs=[];
+    // Calcular price_coin y guardar historial
+    const coinT   = TOKENS.find(t=>t.isCoin);
+    const coinUsd = coinT && newPrices[coinT.pool]?.price_usd || 0;
+    const newRecs = TOKENS.map(t=>{
+      const d   = newPrices[t.pool]||null;
+      const usd = d?.price_usd||0;
+      const coin= t.isCoin ? 1 : (coinUsd>0&&usd>0 ? usd/coinUsd : 0);
+      return {pool:t.pool,name:t.name,em:t.em,cat:t.cat,isCoin:t.isCoin,...(d||{}),price_usd:usd,price_coin:coin,coin_usd:coinUsd,ts};
+    });
 
-    for(const t of TOKENS){
-      const d=allData[t.addr.toLowerCase()]||allData[t.addr]||null;
-      const priceUsd=d?.price_usd||0;
-      const priceCoin=coinUsd>0&&priceUsd>0?(priceUsd/coinUsd):0;
-      newPrices[t.addr]={...d, price_usd:priceUsd, price_coin:priceCoin, coin_usd:coinUsd, ts};
-      newRecs.push({addr:t.addr,name:t.name,em:t.em,cat:t.cat,...(d||{}),price_usd:priceUsd,price_coin:priceCoin,coin_usd:coinUsd,ts});
-    }
-
-    setPrices(newPrices);
-    const merged=purgeOld([...records,...newRecs]);
+    const merged = purge([...records,...newRecs]);
     setRecords(merged);
-    DB.set(RECORDS_KEY,merged);
+    DB.set(REC_KEY,merged);
     setLastFetch(ts);
-    const ok=Object.values(newPrices).filter(d=>d.price_usd>0).length;
-    setStatus(`✅ ${ok}/${TOKENS.length} tokens OK · ${fmtDate(ts)} ${fmtTime(ts)}`);
+    setCurIdx(-1);
+    setStatus(`✅ ${okCount}/${TOKENS.length} tokens OK · ${fmtDate(ts)} ${fmtTime(ts)}`);
     setFetching(false);
   },[fetching,records]);
 
-  // Precio en COIN de cada token
-  const coinUsd=prices[COIN_ADDR]?.price_usd||0;
-  const tokensWithPrices=TOKENS.map(t=>({
-    ...t,
-    price_usd:   prices[t.addr]?.price_usd||0,
-    price_coin:  prices[t.addr]?.price_coin||0,
-    chg_24h:     prices[t.addr]?.chg_24h||0,
-    chg_1h:      prices[t.addr]?.chg_1h||0,
-    vol_24h:     prices[t.addr]?.vol_24h||0,
-    fdv:         prices[t.addr]?.fdv||0,
-    hasData:     (prices[t.addr]?.price_usd||0)>0,
-    ts:          prices[t.addr]?.ts||null,
-  }));
+  const coinUsd=(()=>{
+    const ct=TOKENS.find(t=>t.isCoin);
+    return ct&&(prices[ct.pool]?.price_usd||0)||0;
+  })();
 
-  // Filtros dashboard
-  const visible=tokensWithPrices
-    .filter(t=>t.name!=="COIN")
+  const enrich=t=>{
+    const p=prices[t.pool]||{};
+    const usd=p.price_usd||0;
+    const coin=t.isCoin?1:(coinUsd>0&&usd>0?usd/coinUsd:0);
+    return {...t,price_usd:usd,price_coin:coin,
+      chg_24h:p.chg_24h||0,chg_1h:p.chg_1h||0,
+      vol_24h:p.vol_24h||0,liquidity:p.liquidity||0,
+      fdv:p.fdv||0,txs_24h:p.txs_24h||0,hasData:usd>0};
+  };
+  const enriched=TOKENS.map(enrich);
+
+  const visible=enriched
     .filter(t=>catFilter==="all"||t.cat===catFilter)
     .filter(t=>!search||t.name.toLowerCase().includes(search.toLowerCase()))
     .sort((a,b)=>{
       if(sortBy==="chg_24h") return b.chg_24h-a.chg_24h;
       if(sortBy==="vol_24h") return b.vol_24h-a.vol_24h;
+      if(a.isCoin) return -1; if(b.isCoin) return 1;
       return b.price_coin-a.price_coin;
     });
 
-  // Resumen
-  const sinCoin=tokensWithPrices.filter(t=>t.name!=="COIN"&&t.hasData);
-  const top3Up  =sinCoin.slice().sort((a,b)=>b.chg_24h-a.chg_24h).slice(0,3);
-  const top3Dn  =sinCoin.slice().sort((a,b)=>a.chg_24h-b.chg_24h).slice(0,3);
-  const top3Vol =sinCoin.slice().sort((a,b)=>b.vol_24h-a.vol_24h).slice(0,3);
+  const sinCoin  =enriched.filter(t=>!t.isCoin&&t.hasData);
+  const top3Up   =sinCoin.slice().sort((a,b)=>b.chg_24h-a.chg_24h).slice(0,3);
+  const top3Dn   =sinCoin.slice().sort((a,b)=>a.chg_24h-b.chg_24h).slice(0,3);
+  const top3Vol  =sinCoin.slice().sort((a,b)=>b.vol_24h-a.vol_24h).slice(0,3);
   const top3Price=sinCoin.slice().sort((a,b)=>b.price_coin-a.price_coin).slice(0,3);
-
-  // Historial
-  const histRecs=(filterHist==="all"?records:records.filter(r=>r.name===filterHist)).slice().reverse();
-
-  const pct=prog.total>0?Math.round(prog.done/prog.total*100):0;
+  const histRecs =(filterHist==="all"?records:records.filter(r=>r.name===filterHist)).slice().reverse();
+  const pct      =curIdx>=0?Math.round((curIdx)/TOKENS.length*100):fetching?99:0;
 
   const exportCSV=()=>{
-    const hdr=["Token","Categoría","Precio USD","Precio COIN","Cambio 1h %","Cambio 24h %","Vol 24h USD","FDV","Fecha","Hora"];
-    const body=histRecs.map(r=>[
-      r.name,r.cat,r.price_usd||"",r.price_coin||"",r.chg_1h||"",r.chg_24h||"",
-      r.vol_24h||"",r.fdv||"",fmtDate(r.ts),fmtTime(r.ts)
-    ].join(",")).join("\n");
-    const blob=new Blob(["\uFEFF"+hdr.join(",")+"\n"+body],{type:"text/csv;charset=utf-8;"});
+    const hdr=["Token","Cat","Precio COIN","Precio USD","1h%","24h%","Vol24h","Liquidez","Txs","Fecha","Hora"];
+    const rows=histRecs.map(r=>[r.name,r.cat,r.price_coin||"",r.price_usd||"",r.chg_1h||"",r.chg_24h||"",
+      r.vol_24h||"",r.liquidity||"",r.txs_24h||"",fmtDate(r.ts),fmtTime(r.ts)].join(",")).join("\n");
+    const blob=new Blob(["\uFEFF"+hdr.join(",")+"\n"+rows],{type:"text/csv;charset=utf-8;"});
     const a=document.createElement("a"); a.href=URL.createObjectURL(blob);
-    a.download=`craftworld_${new Date().toISOString().slice(0,16).replace(/[:T]/g,"_")}.csv`;
-    a.click();
+    a.download=`craftworld_${new Date().toISOString().slice(0,16).replace(/[:T]/g,"_")}.csv`; a.click();
   };
 
   const C={
@@ -316,12 +306,14 @@ function Tracker({ onLogout }) {
     th:{background:"#09101d",color:"#2a4a5a",padding:"8px 10px",textAlign:"left",borderBottom:"1px solid #0e1e30",textTransform:"uppercase",letterSpacing:1,fontSize:9,whiteSpace:"nowrap"},
     td:{padding:"7px 10px",whiteSpace:"nowrap",fontSize:11},
   };
+  const CC={base:"#00e5a0",elemento:"#6080ff",tierra:"#c87040",agua:"#4080c0",fuego:"#ff6040",especial:"#c040c0"};
+  const CB={base:"#0d2a1a",elemento:"#0d0d2a",tierra:"#2a1a0a",agua:"#0a1a2a",fuego:"#2a0a0a",especial:"#1a0a2a"};
 
-  const CAT_LABELS={all:"Todos",base:"Base",elemento:"Elementos",tierra:"🌍 Tierra",agua:"💧 Agua",fuego:"🔥 Fuego",especial:"⭐ Especiales"};
+  // Tiempo estimado restante
+  const secsLeft = curIdx>=0 ? Math.round((TOKENS.length-curIdx)*DELAY/1000) : 0;
 
   return (
     <div>
-      {/* HEADER */}
       <header style={{display:"flex",alignItems:"center",gap:12,padding:"12px 20px",background:"#09101d",borderBottom:"1px solid #0e1e30",flexWrap:"wrap"}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <span style={{fontSize:34,animation:"glowHex 4s ease infinite"}}>⬡</span>
@@ -330,33 +322,33 @@ function Tracker({ onLogout }) {
             <div style={{fontSize:8,color:"#00e5a070",letterSpacing:4}}>RONIN · PRICE TRACKER</div>
           </div>
         </div>
-
-        <div style={{flex:1,minWidth:180}}>
-          {fetching&&(
-            <div style={{position:"relative",background:"#0c1a28",border:"1px solid #152840",borderRadius:5,height:22}}>
-              <div style={{position:"absolute",inset:"0 auto 0 0",width:pct+"%",background:"linear-gradient(90deg,#00e5a0,#00c8ff)",borderRadius:5,transition:"width .4s"}}/>
-              <span style={{position:"absolute",width:"100%",textAlign:"center",top:3,fontSize:9,color:"#fff",mixBlendMode:"difference"}}>{prog.done}/{prog.total} lotes · {pct}%</span>
+        <div style={{flex:1,minWidth:200}}>
+          {fetching?(
+            <div style={{display:"flex",flexDirection:"column",gap:4}}>
+              <div style={{position:"relative",background:"#0c1a28",border:"1px solid #152840",borderRadius:5,height:22}}>
+                <div style={{position:"absolute",inset:"0 auto 0 0",width:pct+"%",background:"linear-gradient(90deg,#00e5a0,#00c8ff)",borderRadius:5,transition:"width .8s ease"}}/>
+                <span style={{position:"absolute",width:"100%",textAlign:"center",top:3,fontSize:9,color:"#fff",mixBlendMode:"difference"}}>
+                  {curIdx+1}/{TOKENS.length} tokens · {ok} ok · ~{secsLeft}s restantes
+                </span>
+              </div>
+              <div style={{fontSize:9,color:"#2a5a4a",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{status}</div>
             </div>
-          )}
-          {coinUsd>0&&!fetching&&(
-            <div style={{fontSize:11,color:"#00e5a070"}}>🪙 1 COIN = <strong style={{color:"#00e5a0"}}>${fmtNum(coinUsd,8)}</strong></div>
+          ):(
+            coinUsd>0&&<div style={{fontSize:11,color:"#00e5a070"}}>🪙 1 COIN = <strong style={{color:"#00e5a0"}}>${fmtN(coinUsd,8)}</strong></div>
           )}
         </div>
-
         <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
           {lastFetch&&!fetching&&<span style={{fontSize:9,color:"#2a3a4a"}}>🕐 {fmtDate(lastFetch)} {fmtTime(lastFetch)}</span>}
           <button onClick={doFetch} disabled={fetching}
             style={{...C.btn,background:"#0d2a1a",color:"#00e5a0",border:"1px solid #00e5a030",fontWeight:"bold"}}>
-            {fetching?"↻ Consultando…":"↻ Actualizar"}
+            {fetching?"⏳ Cargando…":"↻ Actualizar"}
           </button>
-          <button onClick={()=>{sessionStorage.clear();onLogout();}}
-            style={{...C.btn,background:"#1a0d0d",color:"#ff6060",border:"1px solid #ff303020"}}>⎋ Salir</button>
+          <button onClick={()=>{sessionStorage.clear();onLogout();}} style={{...C.btn,background:"#1a0d0d",color:"#ff6060",border:"1px solid #ff303020"}}>⎋ Salir</button>
         </div>
       </header>
 
-      {status&&<div style={{background:"#050e0a",borderBottom:"1px solid #0c2016",padding:"5px 20px",fontSize:11,color:"#00e5a0",animation:"slideDown .3s ease"}}>{status}</div>}
+      {!fetching&&status&&<div style={{background:"#050e0a",borderBottom:"1px solid #0c2016",padding:"5px 20px",fontSize:11,color:"#00e5a0",animation:"slideDown .3s ease"}}>{status}</div>}
 
-      {/* TABS */}
       <nav style={{display:"flex",alignItems:"center",background:"#09101d",borderBottom:"1px solid #0e1e30",padding:"0 12px",overflowX:"auto"}}>
         {[["dashboard","📊 Dashboard"],["resumen","⚡ Resumen"],["history","📋 Historial"],["settings","⚙ Config"]].map(([id,lbl])=>(
           <button key={id} onClick={()=>setTab(id)}
@@ -365,136 +357,125 @@ function Tracker({ onLogout }) {
           </button>
         ))}
         <span style={{flex:1}}/>
-        <span style={{fontSize:9,color:"#111820",whiteSpace:"nowrap"}}>{TOKENS.length} tokens · Ronin · GeckoTerminal</span>
+        <span style={{fontSize:9,color:"#111820",whiteSpace:"nowrap"}}>{TOKENS.length} tokens · {DELAY/1000}s/token · GeckoTerminal</span>
       </nav>
 
       <main style={{padding:"16px 16px 48px",maxWidth:1400,margin:"0 auto"}}>
 
-        {/* ══ DASHBOARD ══ */}
-        {tab==="dashboard"&&(
-          <>
-            {/* Stats rápidas */}
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))",gap:10,marginBottom:14}}>
-              {[
-                ["Tokens",TOKENS.length],
-                ["Con datos",tokensWithPrices.filter(t=>t.hasData).length],
-                ["1 COIN",coinUsd>0?"$"+fmtNum(coinUsd,6):"—"],
-                ["Registros",records.length],
-                ["Última actualiz.",lastFetch?fmtTime(lastFetch):"—"],
-              ].map(([l,v])=>(
-                <div key={l} style={{background:"#09101d",border:"1px solid #0e1e30",borderRadius:7,padding:"11px 13px"}}>
-                  <span style={{display:"block",fontSize:18,fontWeight:"bold",color:"#e8f4ff",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{v}</span>
-                  <span style={{display:"block",fontSize:8,color:"#2a3a4a",textTransform:"uppercase",letterSpacing:1,marginTop:2}}>{l}</span>
-                </div>
-              ))}
-            </div>
+        {tab==="dashboard"&&(<>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))",gap:10,marginBottom:14}}>
+            {[["Tokens",TOKENS.length],["Con datos",enriched.filter(t=>t.hasData).length],["1 COIN",coinUsd>0?"$"+fmtN(coinUsd,8):"—"],["Registros",records.length],["Actualizado",lastFetch?fmtTime(lastFetch):"—"]].map(([l,v])=>(
+              <div key={l} style={{background:"#09101d",border:"1px solid #0e1e30",borderRadius:7,padding:"11px 13px"}}>
+                <span style={{display:"block",fontSize:18,fontWeight:"bold",color:"#e8f4ff",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{v}</span>
+                <span style={{display:"block",fontSize:8,color:"#2a3a4a",textTransform:"uppercase",letterSpacing:1,marginTop:2}}>{l}</span>
+              </div>
+            ))}
+          </div>
 
-            {/* Controles */}
-            <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:12,alignItems:"center"}}>
-              <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 Buscar token…"
-                style={{background:"#09101d",border:"1px solid #0e1e30",color:"#b0c4d8",padding:"7px 12px",borderRadius:5,fontFamily:"monospace",fontSize:11,minWidth:160}}/>
+          <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:12,alignItems:"center"}}>
+            <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 Buscar token…"
+              style={{background:"#09101d",border:"1px solid #0e1e30",color:"#b0c4d8",padding:"7px 12px",borderRadius:5,fontFamily:"monospace",fontSize:11,minWidth:160}}/>
+            <select value={catFilter} onChange={e=>setCatFilter(e.target.value)}
+              style={{background:"#09101d",border:"1px solid #0e1e30",color:"#b0c4d8",padding:"7px 10px",borderRadius:5,fontFamily:"monospace",fontSize:11}}>
+              {[["all","Todos"],["base","🪙 Base"],["elemento","🌊 Elementos"],["tierra","🌍 Tierra"],["agua","💧 Agua"],["fuego","🔥 Fuego"],["especial","⭐ Especiales"]].map(([k,v])=><option key={k} value={k}>{v}</option>)}
+            </select>
+            <select value={sortBy} onChange={e=>setSortBy(e.target.value)}
+              style={{background:"#09101d",border:"1px solid #0e1e30",color:"#b0c4d8",padding:"7px 10px",borderRadius:5,fontFamily:"monospace",fontSize:11}}>
+              <option value="price_coin">Precio COIN ↓</option>
+              <option value="chg_24h">Cambio 24h ↓</option>
+              <option value="vol_24h">Volumen 24h ↓</option>
+            </select>
+            <span style={{fontSize:10,color:"#2a3545",marginLeft:"auto"}}>{visible.length} tokens</span>
+          </div>
 
-              <select value={catFilter} onChange={e=>setCatFilter(e.target.value)}
-                style={{background:"#09101d",border:"1px solid #0e1e30",color:"#b0c4d8",padding:"7px 10px",borderRadius:5,fontFamily:"monospace",fontSize:11}}>
-                {Object.entries(CAT_LABELS).map(([k,v])=><option key={k} value={k}>{v}</option>)}
-              </select>
-
-              <select value={sortBy} onChange={e=>setSortBy(e.target.value)}
-                style={{background:"#09101d",border:"1px solid #0e1e30",color:"#b0c4d8",padding:"7px 10px",borderRadius:5,fontFamily:"monospace",fontSize:11}}>
-                <option value="price_coin">Ordenar: Precio COIN ↓</option>
-                <option value="chg_24h">Ordenar: Cambio 24h ↓</option>
-                <option value="vol_24h">Ordenar: Volumen 24h ↓</option>
-              </select>
-
-              <span style={{fontSize:10,color:"#2a3545",marginLeft:"auto"}}>{visible.length} tokens</span>
-            </div>
-
-            {/* Cards */}
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:10}}>
-              {visible.map(t=>{
-                const isUp=t.chg_24h>=0;
-                return (
-                  <div key={t.addr} className="pool-card"
-                    style={{background:"#09101d",border:"1px solid #0e1e30",borderRadius:7,padding:12,display:"flex",flexDirection:"column",gap:5}}>
-                    <div style={{display:"flex",alignItems:"center",gap:6}}>
-                      <span style={{fontSize:18}}>{t.em}</span>
-                      <span style={{fontWeight:"bold",color:"#e8f4ff",fontSize:13}}>{t.name}</span>
-                      <span style={{marginLeft:"auto",fontSize:8,background:{base:"#1a2a1a",elemento:"#1a1a3a",tierra:"#2a1a0a",agua:"#0a1a2a",fuego:"#2a0a0a",especial:"#1a0a2a"}[t.cat]||"#0e1e30",color:{base:"#00e5a0",elemento:"#6080ff",tierra:"#c87040",agua:"#4080c0",fuego:"#ff6040",especial:"#c040c0"}[t.cat]||"#5a8a9a",padding:"2px 6px",borderRadius:3,textTransform:"uppercase",letterSpacing:1}}>{t.cat}</span>
-                    </div>
-
-                    {t.hasData?(
-                      <>
-                        <div style={{display:"flex",flexDirection:"column",gap:2}}>
-                          <div style={{display:"flex",alignItems:"baseline",gap:6}}>
-                            <span style={{fontSize:15,fontWeight:"bold",color:"#00e5a0"}}>{fmtNum(t.price_coin,5)} COIN</span>
-                          </div>
-                          <div style={{fontSize:10,color:"#3a5a6a"}}>${fmtNum(t.price_usd)}</div>
-                        </div>
-                        <div style={{display:"flex",gap:6,alignItems:"center"}}>
-                          <span style={{fontSize:11,fontWeight:"bold",color:isUp?"#00e5a0":"#ff6060"}}>{isUp?"▲":"▼"} {Math.abs(t.chg_24h).toFixed(2)}%</span>
-                          <span style={{fontSize:9,color:"#2a3545"}}>24h</span>
-                          {t.chg_1h!==0&&<span style={{fontSize:9,color:t.chg_1h>=0?"#00a070":"#cc4040",marginLeft:"auto"}}>{t.chg_1h>=0?"+":""}{t.chg_1h.toFixed(2)}% 1h</span>}
-                        </div>
-                        <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
-                          {t.vol_24h>0&&<span style={{fontSize:9,color:"#2a4a5a",background:"#0c1520",padding:"2px 5px",borderRadius:3}}>Vol: ${compact(t.vol_24h)}</span>}
-                          {t.fdv>0&&<span style={{fontSize:9,color:"#2a4a5a",background:"#0c1520",padding:"2px 5px",borderRadius:3}}>FDV: ${compact(t.fdv)}</span>}
-                        </div>
-                      </>
-                    ):(
-                      <div style={{fontSize:10,color:"#1e3040",fontStyle:"italic",padding:"8px 0"}}>Sin datos — presiona Actualizar</div>
-                    )}
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:10}}>
+            {visible.map((t,vi)=>{
+              const isUp=t.chg_24h>=0;
+              const isCurrent = fetching && TOKENS.findIndex(tk=>tk.pool===t.pool)===curIdx;
+              return (
+                <div key={t.pool} className="pool-card"
+                  style={{background:"#09101d",border:`1px solid ${isCurrent?"#00e5a050":"#0e1e30"}`,borderRadius:7,padding:12,display:"flex",flexDirection:"column",gap:5,
+                    transition:"border-color .3s"}}>
+                  <div style={{display:"flex",alignItems:"center",gap:6}}>
+                    <span style={{fontSize:20}}>{t.em}</span>
+                    <span style={{fontWeight:"bold",color:"#e8f4ff",fontSize:13}}>{t.name}</span>
+                    {isCurrent&&<span style={{fontSize:8,color:"#00e5a0",animation:"glowHex 1s infinite",marginLeft:4}}>↻</span>}
+                    <span style={{marginLeft:"auto",fontSize:8,background:CB[t.cat]||"#0e1e30",color:CC[t.cat]||"#5a8a9a",padding:"2px 6px",borderRadius:3,textTransform:"uppercase",letterSpacing:1}}>{t.cat}</span>
                   </div>
-                );
-              })}
-            </div>
-          </>
-        )}
+                  {t.hasData?(
+                    <>
+                      <div style={{display:"flex",flexDirection:"column",gap:2}}>
+                        <span style={{fontSize:16,fontWeight:"bold",color:"#00e5a0"}}>
+                          {t.isCoin?`$${fmtN(t.price_usd,8)}`:`${fmtN(t.price_coin,4)} COIN`}
+                        </span>
+                        <span style={{fontSize:10,color:"#3a5a6a"}}>
+                          {t.isCoin?"DynoCoin · Ronin":`$${fmtN(t.price_usd,6)}`}
+                        </span>
+                      </div>
+                      <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                        <span style={{fontSize:11,fontWeight:"bold",color:isUp?"#00e5a0":"#ff6060"}}>{isUp?"▲":"▼"} {Math.abs(t.chg_24h).toFixed(2)}%</span>
+                        <span style={{fontSize:9,color:"#2a3545"}}>24h</span>
+                        {t.chg_1h!==0&&<span style={{fontSize:9,color:t.chg_1h>=0?"#00a070":"#cc4040",marginLeft:"auto"}}>{t.chg_1h>=0?"+":""}{t.chg_1h.toFixed(2)}% 1h</span>}
+                      </div>
+                      <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+                        {t.vol_24h>0&&<span style={{fontSize:9,color:"#2a4a5a",background:"#0c1520",padding:"2px 5px",borderRadius:3}}>Vol: ${cmpct(t.vol_24h)}</span>}
+                        {t.liquidity>0&&<span style={{fontSize:9,color:"#2a4a5a",background:"#0c1520",padding:"2px 5px",borderRadius:3}}>Liq: ${cmpct(t.liquidity)}</span>}
+                        {t.txs_24h>0&&<span style={{fontSize:9,color:"#2a4a5a",background:"#0c1520",padding:"2px 5px",borderRadius:3}}>{t.txs_24h} txs</span>}
+                      </div>
+                    </>
+                  ):(
+                    <div style={{fontSize:10,padding:"8px 0",fontStyle:"italic",
+                      color:isCurrent?"#00e5a060":fetching&&TOKENS.findIndex(tk=>tk.pool===t.pool)>curIdx?"#1a3a2a":"#1e3040"}}>
+                      {isCurrent?"↻ Consultando…":fetching&&TOKENS.findIndex(tk=>tk.pool===t.pool)>curIdx?"⏳ En cola…":"Sin datos"}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </>)}
 
-        {/* ══ RESUMEN ══ */}
         {tab==="resumen"&&(
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:14}}>
             {[
-              {title:"🚀 Mayores subidas 24h", items:top3Up,  color:"#00e5a0", val:t=>`${t.chg_24h>=0?"+":""}${t.chg_24h.toFixed(2)}%`},
-              {title:"💀 Mayores bajas 24h",   items:top3Dn,  color:"#ff6060", val:t=>`${t.chg_24h.toFixed(2)}%`},
-              {title:"📦 Más volumen 24h",     items:top3Vol, color:"#7ecff0", val:t=>`$${compact(t.vol_24h)}`},
-              {title:"👑 Más caros en COIN",   items:top3Price,color:"#c8a040",val:t=>`${fmtNum(t.price_coin,4)} COIN`},
+              {title:"🚀 Mayores subidas 24h", items:top3Up,   color:"#00e5a0", val:t=>`${t.chg_24h>=0?"+":""}${t.chg_24h.toFixed(2)}%`},
+              {title:"💀 Mayores bajas 24h",   items:top3Dn,   color:"#ff6060", val:t=>`${t.chg_24h.toFixed(2)}%`},
+              {title:"📦 Más volumen 24h",     items:top3Vol,  color:"#7ecff0", val:t=>`$${cmpct(t.vol_24h)}`},
+              {title:"👑 Más caros en COIN",   items:top3Price,color:"#c8a040", val:t=>`${fmtN(t.price_coin,4)} COIN`},
             ].map(({title,items,color,val})=>(
               <div key={title} style={{background:"#09101d",border:"1px solid #0e1e30",borderRadius:10,padding:16}}>
                 <div style={{fontSize:12,color:"#5a8aaa",letterSpacing:1,marginBottom:12,fontWeight:"bold"}}>{title}</div>
-                {items.length===0
-                  ?<div style={{color:"#1e3040",fontSize:11}}>Sin datos — presiona Actualizar</div>
-                  :items.map((t,i)=>(
-                    <div key={t.addr} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderBottom:i<items.length-1?"1px solid #0e1e30":"none"}}>
-                      <span style={{fontSize:10,color:"#2a3545",width:16}}>{i+1}.</span>
-                      <span style={{fontSize:18}}>{t.em}</span>
-                      <div style={{flex:1}}>
-                        <div style={{fontSize:12,fontWeight:"bold",color:"#e8f4ff"}}>{t.name}</div>
-                        <div style={{fontSize:10,color:"#3a5a6a"}}>{fmtNum(t.price_coin,4)} COIN · ${fmtNum(t.price_usd)}</div>
-                      </div>
-                      <span style={{fontSize:12,fontWeight:"bold",color}}>{val(t)}</span>
+                {items.length===0?<div style={{color:"#1e3040",fontSize:11}}>Sin datos — presiona Actualizar</div>
+                :items.map((t,i)=>(
+                  <div key={t.pool} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderBottom:i<items.length-1?"1px solid #0e1e30":"none"}}>
+                    <span style={{fontSize:10,color:"#2a3545",width:16}}>{i+1}.</span>
+                    <span style={{fontSize:20}}>{t.em}</span>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:12,fontWeight:"bold",color:"#e8f4ff"}}>{t.name}</div>
+                      <div style={{fontSize:10,color:"#3a5a6a"}}>{fmtN(t.price_coin,4)} COIN · ${fmtN(t.price_usd,6)}</div>
                     </div>
-                  ))
-                }
+                    <span style={{fontSize:12,fontWeight:"bold",color}}>{val(t)}</span>
+                  </div>
+                ))}
               </div>
             ))}
-
-            {/* Tabla completa ordenada */}
             <div style={{gridColumn:"1/-1",background:"#09101d",border:"1px solid #0e1e30",borderRadius:10,padding:16,overflowX:"auto"}}>
-              <div style={{fontSize:12,color:"#5a8aaa",letterSpacing:1,marginBottom:12,fontWeight:"bold"}}>📊 Todos los tokens ordenados por precio</div>
+              <div style={{fontSize:12,color:"#5a8aaa",letterSpacing:1,marginBottom:12,fontWeight:"bold"}}>📊 Todos los tokens — precio mayor a menor</div>
               <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
-                <thead><tr>
-                  {["#","Token","Precio COIN","Precio USD","1h %","24h %","Vol 24h"].map(h=><th key={h} style={C.th}>{h}</th>)}
-                </tr></thead>
+                <thead><tr>{["#","Token","Cat","Precio COIN","Precio USD","1h %","24h %","Vol 24h","Liquidez","Txs"].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead>
                 <tbody>
-                  {sinCoin.slice().sort((a,b)=>b.price_coin-a.price_coin).map((t,i)=>(
-                    <tr key={t.addr} style={{background:i%2===0?"#070b12":"#09101d"}}>
+                  {enriched.filter(t=>!t.isCoin).slice().sort((a,b)=>b.price_coin-a.price_coin).map((t,i)=>(
+                    <tr key={t.pool} style={{background:i%2===0?"#070b12":"#09101d"}}>
                       <td style={{...C.td,color:"#2a3545"}}>{i+1}</td>
                       <td style={C.td}><span style={{marginRight:6}}>{t.em}</span><strong style={{color:"#e8f4ff"}}>{t.name}</strong></td>
-                      <td style={{...C.td,color:"#00e5a0",fontWeight:"bold"}}>{fmtNum(t.price_coin,4)}</td>
-                      <td style={{...C.td,color:"#3a6a5a"}}>${fmtNum(t.price_usd)}</td>
-                      <td style={{...C.td,color:t.chg_1h>=0?"#00e5a0":"#ff6060"}}>{t.chg_1h>=0?"+":""}{t.chg_1h.toFixed(2)}%</td>
-                      <td style={{...C.td,color:t.chg_24h>=0?"#00e5a0":"#ff6060"}}>{t.chg_24h>=0?"+":""}{t.chg_24h.toFixed(2)}%</td>
-                      <td style={C.td}>{t.vol_24h>0?"$"+compact(t.vol_24h):"—"}</td>
+                      <td style={C.td}><span style={{fontSize:8,background:CB[t.cat],color:CC[t.cat],padding:"2px 5px",borderRadius:3}}>{t.cat}</span></td>
+                      <td style={{...C.td,color:"#00e5a0",fontWeight:"bold"}}>{t.hasData?fmtN(t.price_coin,4):"—"}</td>
+                      <td style={{...C.td,color:"#3a6a5a"}}>{t.hasData?"$"+fmtN(t.price_usd,6):"—"}</td>
+                      <td style={{...C.td,color:t.chg_1h>=0?"#00e5a0":"#ff6060"}}>{t.hasData?(t.chg_1h>=0?"+":"")+t.chg_1h.toFixed(2)+"%":"—"}</td>
+                      <td style={{...C.td,color:t.chg_24h>=0?"#00e5a0":"#ff6060"}}>{t.hasData?(t.chg_24h>=0?"+":"")+t.chg_24h.toFixed(2)+"%":"—"}</td>
+                      <td style={C.td}>{t.vol_24h>0?"$"+cmpct(t.vol_24h):"—"}</td>
+                      <td style={C.td}>{t.liquidity>0?"$"+cmpct(t.liquidity):"—"}</td>
+                      <td style={C.td}>{t.txs_24h>0?t.txs_24h:"—"}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -503,81 +484,82 @@ function Tracker({ onLogout }) {
           </div>
         )}
 
-        {/* ══ HISTORIAL ══ */}
-        {tab==="history"&&(
-          <>
-            <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:12,flexWrap:"wrap"}}>
-              <select value={filterHist} onChange={e=>setFilterHist(e.target.value)}
-                style={{background:"#09101d",border:"1px solid #0e1e30",color:"#b0c4d8",padding:"7px 10px",borderRadius:5,fontFamily:"monospace",fontSize:11}}>
-                <option value="all">Todos los tokens</option>
-                {TOKENS.map(t=><option key={t.addr} value={t.name}>{t.em} {t.name}</option>)}
-              </select>
-              <button onClick={exportCSV} style={{...C.btn,background:"#0d2a1a",color:"#00e5a0",border:"1px solid #00e5a030"}}>⬇ Descargar CSV</button>
-              <span style={{fontSize:10,color:"#2a3a4a",marginLeft:"auto"}}>{histRecs.length} registros</span>
+        {tab==="history"&&(<>
+          <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:12,flexWrap:"wrap"}}>
+            <select value={filterHist} onChange={e=>setFilterHist(e.target.value)}
+              style={{background:"#09101d",border:"1px solid #0e1e30",color:"#b0c4d8",padding:"7px 10px",borderRadius:5,fontFamily:"monospace",fontSize:11}}>
+              <option value="all">Todos los tokens</option>
+              {TOKENS.map(t=><option key={t.pool} value={t.name}>{t.em} {t.name}</option>)}
+            </select>
+            <button onClick={exportCSV} style={{...C.btn,background:"#0d2a1a",color:"#00e5a0",border:"1px solid #00e5a030"}}>⬇ CSV</button>
+            <span style={{fontSize:10,color:"#2a3a4a",marginLeft:"auto"}}>{histRecs.length} registros</span>
+          </div>
+          {histRecs.length===0
+            ?<div style={{color:"#2a3a4a",textAlign:"center",padding:"60px 20px",fontSize:13}}>Sin registros. Presiona <strong style={{color:"#00e5a0"}}>↻ Actualizar</strong>.</div>
+            :<div style={{overflowX:"auto"}}>
+              <table style={{width:"100%",borderCollapse:"collapse",fontSize:11,fontFamily:"monospace"}}>
+                <thead><tr>{["Token","Precio COIN","Precio USD","1h%","24h%","Vol 24h","Liquidez","Txs","Fecha","Hora"].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead>
+                <tbody>
+                  {histRecs.map((r,i)=>(
+                    <tr key={i} style={{background:i%2===0?"#070b12":"#09101d"}}>
+                      <td style={C.td}><span style={{marginRight:5}}>{r.em}</span><strong style={{color:"#e8f4ff"}}>{r.name}</strong></td>
+                      <td style={{...C.td,color:"#00e5a0",fontWeight:"bold"}}>{r.isCoin?`$${fmtN(r.price_usd,8)}`:(r.price_coin>0?fmtN(r.price_coin,4):"—")}</td>
+                      <td style={{...C.td,color:"#3a6a5a"}}>{r.price_usd>0?"$"+fmtN(r.price_usd,6):"—"}</td>
+                      <td style={{...C.td,color:(r.chg_1h||0)>=0?"#00e5a0":"#ff6060"}}>{r.chg_1h?(r.chg_1h>=0?"+":"")+r.chg_1h.toFixed(2)+"%":"—"}</td>
+                      <td style={{...C.td,color:(r.chg_24h||0)>=0?"#00e5a0":"#ff6060"}}>{r.chg_24h?(r.chg_24h>=0?"+":"")+r.chg_24h.toFixed(2)+"%":"—"}</td>
+                      <td style={C.td}>{r.vol_24h>0?"$"+cmpct(r.vol_24h):"—"}</td>
+                      <td style={C.td}>{r.liquidity>0?"$"+cmpct(r.liquidity):"—"}</td>
+                      <td style={C.td}>{r.txs_24h>0?r.txs_24h:"—"}</td>
+                      <td style={{...C.td,color:"#445"}}>{fmtDate(r.ts)}</td>
+                      <td style={{...C.td,color:"#00e5a0"}}>{fmtTime(r.ts)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-            {histRecs.length===0
-              ?<div style={{color:"#2a3a4a",textAlign:"center",padding:"60px 20px",fontSize:13}}>Sin registros. Presiona <strong style={{color:"#00e5a0"}}>↻ Actualizar</strong>.</div>
-              :<div style={{overflowX:"auto"}}>
-                <table style={{width:"100%",borderCollapse:"collapse",fontSize:11,fontFamily:"monospace"}}>
-                  <thead><tr>
-                    {["Token","Precio COIN","Precio USD","1h %","24h %","Vol 24h","Fecha","Hora"].map(h=><th key={h} style={C.th}>{h}</th>)}
-                  </tr></thead>
-                  <tbody>
-                    {histRecs.map((r,i)=>(
-                      <tr key={i} style={{background:i%2===0?"#070b12":"#09101d"}}>
-                        <td style={C.td}><span style={{marginRight:5}}>{r.em}</span><strong style={{color:"#e8f4ff"}}>{r.name}</strong></td>
-                        <td style={{...C.td,color:"#00e5a0",fontWeight:"bold"}}>{r.price_coin>0?fmtNum(r.price_coin,4):"—"}</td>
-                        <td style={{...C.td,color:"#3a6a5a"}}>{r.price_usd>0?"$"+fmtNum(r.price_usd):"—"}</td>
-                        <td style={{...C.td,color:(r.chg_1h||0)>=0?"#00e5a0":"#ff6060"}}>{r.chg_1h!=null?(r.chg_1h>=0?"+":"")+r.chg_1h.toFixed(2)+"%":"—"}</td>
-                        <td style={{...C.td,color:(r.chg_24h||0)>=0?"#00e5a0":"#ff6060"}}>{r.chg_24h!=null?(r.chg_24h>=0?"+":"")+r.chg_24h.toFixed(2)+"%":"—"}</td>
-                        <td style={C.td}>{r.vol_24h>0?"$"+compact(r.vol_24h):"—"}</td>
-                        <td style={{...C.td,color:"#445"}}>{fmtDate(r.ts)}</td>
-                        <td style={{...C.td,color:"#00e5a0"}}>{fmtTime(r.ts)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            }
-          </>
-        )}
+          }
+        </>)}
 
-        {/* ══ CONFIG ══ */}
         {tab==="settings"&&(
           <div style={{display:"flex",flexDirection:"column",gap:14,maxWidth:700}}>
             <div style={{background:"#09101d",border:"1px solid #0e1e30",borderRadius:8,padding:18}}>
               <h3 style={{fontSize:11,color:"#5a9aaa",letterSpacing:2,textTransform:"uppercase",margin:"0 0 12px"}}>⏱ Auto-actualización</h3>
               <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-                {[[0,"Manual"],[5,"5 min"],[15,"15 min"],[30,"30 min"],[60,"1 h"]].map(([v,l])=>(
+                {[[0,"Manual"],[15,"15 min"],[30,"30 min"],[60,"1 h"],[120,"2 h"]].map(([v,l])=>(
                   <button key={v} onClick={()=>setAutoMin(v)}
                     style={{...C.btn,background:autoMin===v?"#0d2a1a":"#070b12",border:autoMin===v?"1px solid #00e5a0":"1px solid #0e1e30",color:autoMin===v?"#00e5a0":"#2a4050"}}>
                     {l}
                   </button>
                 ))}
               </div>
-              {autoMin>0&&<p style={{fontSize:11,color:"#2a4050",marginTop:8}}>✅ Auto-fetch activo cada <strong style={{color:"#00e5a0"}}>{autoMin} min</strong>. Mantén la pestaña abierta.</p>}
+              {autoMin>0&&<p style={{fontSize:11,color:"#2a4050",marginTop:8}}>✅ Auto-fetch cada <strong style={{color:"#00e5a0"}}>{autoMin} min</strong>. Mantén la pestaña abierta.</p>}
             </div>
-
             <div style={{background:"#09101d",border:"1px solid #0e1e30",borderRadius:8,padding:18}}>
-              <h3 style={{fontSize:11,color:"#5a9aaa",letterSpacing:2,textTransform:"uppercase",margin:"0 0 12px"}}>🗄 Info</h3>
-              {[["Tokens","34"],["Retención historial","72h (3 días)"],["Almacenamiento","localStorage"],["Red","Ronin Network"],["API","GeckoTerminal v2 (gratis)"],["Fuente addresses","RAWRTools + Defined.fi"]].map(([k,v])=>(
+              <h3 style={{fontSize:11,color:"#5a9aaa",letterSpacing:2,textTransform:"uppercase",margin:"0 0 12px"}}>🗄 Info técnica</h3>
+              {[
+                ["API","GeckoTerminal /pools/{addr} (CORS ✅)"],
+                ["Estrategia","1 token por request, secuencial"],
+                ["Delay entre tokens",""+DELAY+"ms (respeta rate limit 30/min)"],
+                ["Reintento en 429","Hasta 5x con backoff progresivo"],
+                ["Tiempo total estimado",`~${Math.round(TOKENS.length*DELAY/1000)}s`],
+                ["Tokens",""+TOKENS.length],
+                ["Retención historial","72h (3 días)"],
+                ["Fuente addresses","RAWRTools · Defined.fi"],
+              ].map(([k,v])=>(
                 <div key={k} style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid #0e1e30"}}>
                   <span style={{fontSize:12,color:"#445"}}>{k}</span>
                   <span style={{fontSize:12,color:"#7ecff0",fontFamily:"monospace"}}>{v}</span>
                 </div>
               ))}
             </div>
-
             <div style={{background:"#09101d",border:"1px solid #0e1e30",borderRadius:8,padding:18}}>
               <h3 style={{fontSize:11,color:"#5a9aaa",letterSpacing:2,textTransform:"uppercase",margin:"0 0 12px"}}>🔐 Contraseña</h3>
               <p style={{fontSize:11,color:"#2a4050",lineHeight:1.8}}>
-                Abrí el archivo <code style={{color:"#7ecff0"}}>index.html</code> con un editor y buscá:<br/>
+                Abrí <code style={{color:"#7ecff0"}}>index.html</code> con un editor y cambiá:<br/>
                 <code style={{color:"#00e5a0",display:"block",marginTop:6,padding:"6px 10px",background:"#070b12",borderRadius:4}}>const CW_PASSWORD = "craftworld2024";</code>
-                Reemplazá por tu nueva contraseña y volvé a subir el archivo.
               </p>
             </div>
-
-            <button onClick={()=>{if(confirm("¿Borrar TODOS los registros del historial?")){ setRecords([]); DB.set(RECORDS_KEY,[]); setStatus("🗑 Historial borrado."); }}}
+            <button onClick={()=>{if(confirm("¿Borrar TODOS los registros?")){setRecords([]);DB.set(REC_KEY,[]);setStatus("🗑 Historial borrado.");}}}
               style={{...C.btn,background:"#2a0d0d",color:"#ff6b6b",border:"1px solid #ff3a3a40",padding:"10px 18px",alignSelf:"flex-start"}}>
               🗑 Borrar historial
             </button>
@@ -593,7 +575,6 @@ function Root() {
   if(!authed) return <LoginScreen onAuth={()=>setAuthed(true)}/>;
   return <Tracker onLogout={()=>setAuthed(false)}/>;
 }
-
 ReactDOM.createRoot(document.getElementById("root")).render(<Root/>);
 </script>
 </body>
