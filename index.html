@@ -345,17 +345,14 @@ function Tracker({ onLogout }) {
           </div>
 
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:10}}>
-            {visible.map((t,vi)=>{
+            {visible.map((t)=>{
               const isUp=t.chg_24h>=0;
-              const isCurrent = fetching && TOKENS.findIndex(tk=>tk.pool===t.pool)===curIdx;
               return (
                 <div key={t.pool} className="pool-card"
-                  style={{background:"#09101d",border:`1px solid ${isCurrent?"#00e5a050":"#0e1e30"}`,borderRadius:7,padding:12,display:"flex",flexDirection:"column",gap:5,
-                    transition:"border-color .3s"}}>
+                  style={{background:"#09101d",border:"1px solid #0e1e30",borderRadius:7,padding:12,display:"flex",flexDirection:"column",gap:5}}>
                   <div style={{display:"flex",alignItems:"center",gap:6}}>
                     <span style={{fontSize:20}}>{t.em}</span>
                     <span style={{fontWeight:"bold",color:"#e8f4ff",fontSize:13}}>{t.name}</span>
-                    {isCurrent&&<span style={{fontSize:8,color:"#00e5a0",animation:"glowHex 1s infinite",marginLeft:4}}>↻</span>}
                     <span style={{marginLeft:"auto",fontSize:8,background:CB[t.cat]||"#0e1e30",color:CC[t.cat]||"#5a8a9a",padding:"2px 6px",borderRadius:3,textTransform:"uppercase",letterSpacing:1}}>{t.cat}</span>
                   </div>
                   {t.hasData?(
